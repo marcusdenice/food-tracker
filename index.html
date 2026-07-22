@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vegan Nutrition Tracker</title>
+
+<style>
+  /* ============================================================
+     COLORS & BASE STYLES
+     A small set of named colors used everywhere below, so the
+     whole look can be re-themed by changing just these.
+     ============================================================ */
+  :root {
+    --bg: #f6f4ef;           /* page background, warm off-white */
+    --panel: #ffffff;        /* card / panel background */
+    --ink: #2b2b25;          /* main text color */
+    --ink-soft: #6b6b5f;     /* secondary / label text */
+    --green: #4a7c59;        /* primary accent - "vegan" green */
+    --green-dark: #345c3f;
+    --green-pale: #e3ece5;   /* pale green for bar backgrounds */
+    --amber: #c98a2c;        /* used for "over target" warnings (e.g. sodium) */
+    --border: #e2ded3;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.4;
+  }
+
+  .app {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px 16px 80px;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    margin: 0 0 4px;
+    color: var(--green-dark);
+  }
+  .subtitle {
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+  }
+
+  h2 {
+    font-size: 1.05rem;
+    margin: 0 0 12px;
+    color: var(--green-dark);
+    border-bottom: 2px solid var(--green-pale);
+    padding-bottom: 6px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+
+  /* ---------- Settings / profile form ---------- */
+  .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  input[type="number"], select, input[type="date"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background: #fff;
+    color: var(--ink);
+  }
+  button {
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    border: 1px solid var(--green);
+    background: var(--green);
+    color: #fff;
+    padding: 8px 14px;
+  }
+  button:hover { background: var(--green-dark); }
+  button.secondary {
+    background: #fff;
+    color: var(--green-dark);
+  }
+  button.secondary:hover { background: var(--green-pale); }
+  button.small {
+    padding: 2px 8px;
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Sliders for calories / protein / fat / carbs ---------- */
+  .slider-row {
+    margin-bottom: 14px;
+  }
+  .slider-row .row-top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+  }
+  .slider-row .row-top .value {
+    color: var(--green-dark);
+    font-weight: 600;
+  }
+  input[type="range"] {
+    width: 100%;
+  }
+
+  /* ---------- Nutrient progress bars ---------- */
+  .nutrient-section-title {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    margin: 18px 0 8px;
+  }
+  .nutrient-row {
+    margin-bottom: 8px;
+  }
+  .nutrient-row .row-top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    margin-bottom: 3px;
+  }
+  .nutrient-row .row-top .name { color: var(--ink); }
+  .nutrient-row .row-top .amounts { color: var(--ink-soft); }
+  .bar-track {
+    background: var(--green-pale);
+    border-radius: 6px;
+    height: 8px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 6px 0 0 6px;
+  }
+  .bar-fill.over-limit { background: var(--amber); } /* e.g. sodium over the daily limit */
+
+  /* ---------- Meal sections ---------- */
+  .meal-block {
+    margin-bottom: 22px;
+  }
+  .meal-block h3 {
+    font-size: 1rem;
+    margin: 0 0 8px;
+    color: var(--green-dark);
+  }
+  .food-search-wrap {
+    position: relative;
+    margin-bottom: 10px;
+  }
+  .food-search-wrap input[type="text"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.95rem;
+  }
+  .search-results {
+    position: absolute;
+    z-index: 5;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+    width: 100%;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  }
+  .search-results div {
+    padding: 8px 10px;
+    font-size: 0.88rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-results div:hover { background: var(--green-pale); }
+
+  table.food-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  table.food-table th, table.food-table td {
+    text-align: left;
+    padding: 6px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .gram-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .gram-control input[type="number"] {
+    width: 60px;
+    padding: 4px;
+    text-align: right;
+  }
+  .gram-control button {
+    padding: 2px 8px;
+    line-height: 1;
+  }
+  .remove-btn {
+    background: none;
+    border: none;
+    color: #b34a4a;
+    font-size: 1rem;
+    padding: 0 6px;
+  }
+  .remove-btn:hover { background: none; text-decoration: underline; }
+
+  .empty-note {
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    font-style: italic;
+    padding: 6px 0;
+  }
+
+  /* ---------- Export section ---------- */
+  .export-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .day-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <h1>Vegan Nutrition Tracker</h1>
+  <div class="subtitle">Built on the USDA SR Legacy food database, filtered to vegan foods</div>
+
+  <!-- ============================================================
+       DAY PICKER
+       Every day's food log is stored separately (keyed by date), so
+       you can look back at past days. Changing the date here loads
+       that day's saved meals (or starts a blank day if none saved yet).
+       ============================================================ -->
+  <div class="day-picker-row">
+    <label style="margin:0;">Day:</label>
+    <input type="date" id="dayPicker">
+  </div>
+
+  <!-- ============================================================
+       SETTINGS / PROFILE PANEL
+       ============================================================ -->
+  <div class="panel">
+    <h2>Your Profile</h2>
+    <div class="settings-grid">
+      <div>
+        <label for="inputAge">Age (years)</label>
+        <input type="number" id="inputAge" min="1" max="120">
+      </div>
+      <div>
+        <label for="inputWeight">Weight (lbs)</label>
+        <input type="number" id="inputWeight" min="1" max="1000">
+      </div>
+      <div>
+        <label for="inputGender">Gender</label>
+        <select id="inputGender">
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+      </div>
+      <div>
+        <label for="inputActivity">Activity level</label>
+        <select id="inputActivity">
+          <option value="sedentary">Sedentary (little/no exercise)</option>
+          <option value="light">Light (exercise 1-3 days/wk)</option>
+          <option value="moderate">Moderate (exercise 3-5 days/wk)</option>
+          <option value="active">Active (exercise 6-7 days/wk)</option>
+          <option value="veryActive">Very active (hard daily exercise)</option>
+        </select>
+      </div>
+    </div>
+    <button id="btnRecalc">Recalculate targets from profile</button>
+
+    <!-- Sliders for the 4 headline targets. These start out set from the
+         profile calculation above, but you can drag them to any value you
+         want afterward - they are just numbers stored in state.targets. -->
+    <div style="margin-top:18px;">
+      <div class="slider-row">
+        <div class="row-top"><span>Calories</span><span class="value" id="calorieValue"></span></div>
+        <input type="range" id="sliderCalories" min="1000" max="5000" step="10">
+      </div>
+      <div class="slider-row">
+        <div class="row-top"><span>Protein (g)</span><span class="value" id="proteinValue"></span></div>
+        <input type="range" id="sliderProtein" min="0" max="400" step="1">
+      </div>
+      <div class="slider-row">
+        <div class="row-top"><span>Fat (g)</span><span class="value" id="fatValue"></span></div>
+        <input type="range" id="sliderFat" min="0" max="300" step="1">
+      </div>
+      <div class="slider-row">
+        <div class="row-top"><span>Carbs (g)</span><span class="value" id="carbsValue"></span></div>
+        <input type="range" id="sliderCarbs" min="0" max="700" step="1">
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       NUTRIENT PROGRESS PANEL
+       Filled in by renderNutrientProgress() in the script below.
+       ============================================================ -->
+  <div class="panel">
+    <h2>Nutrients Today</h2>
+    <div id="nutrientProgress"></div>
+  </div>
+
+  <!-- ============================================================
+       MEAL SECTIONS
+       Each meal gets identical markup, generated by buildMealBlock()
+       in the script below, so there's only one place to edit the
+       meal-section behavior.
+       ============================================================ -->
+  <div class="panel" id="mealsContainer"></div>
+
+  <!-- ============================================================
+       SAVE / EXPORT PANEL
+       ============================================================ -->
+  <div class="panel">
+    <h2>Save Today's Food List</h2>
+    <p style="color:var(--ink-soft); font-size:0.88rem; margin-top:-6px;">
+      Downloads everything logged for the selected day.
+    </p>
+    <div class="export-buttons">
+      <button class="secondary" id="btnExportJson">Download JSON</button>
+      <button class="secondary" id="btnExportCsv">Download CSV</button>
+      <button class="secondary" id="btnExportText">Download Text</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- foods.js defines the global FOODS array (the filtered USDA SR Legacy data) -->
+<script src="foods.js"></script>
+
+<script>
+/* ================================================================
+   SECTION 1: CONSTANTS
+   Reference data for calorie/nutrient targets. Grouped here so it's
+   easy to find and tweak without hunting through app logic.
+   ================================================================ */
+
+// Activity multipliers applied to estimated resting calorie burn (BMR)
+// to get total daily calories. Standard values used by most nutrition apps.
+const ACTIVITY_MULTIPLIERS = {
+  sedentary: 1.2,
+  light: 1.375,
+  moderate: 1.55,
+  active: 1.725,
+  veryActive: 1.9
+};
+
+// Default macro split (% of total calories) used to seed the sliders.
+// You can always drag the sliders to something else afterward - this
+// is just the starting point.
+const DEFAULT_MACRO_SPLIT = { protein: 0.20, fat: 0.30, carbs: 0.50 };
+const CALORIES_PER_GRAM = { protein: 4, fat: 9, carbs: 4 };
+
+// ---- Vitamin & mineral daily targets (RDA/AI, standard adult values) ----
+// Where male/female values differ, both are listed. These are general
+// population targets (NIH Office of Dietary Supplements tables), not
+// personalized medical advice.
+// Nutrient keys match the "key" names used in foods.js (per100g.<key>).
+const NUTRIENT_TARGETS = {
+  // -- minerals --
+  calcium_mg:      { male: 1000, female: 1000 },
+  iron_mg:         { male: 8,    female: 18 },
+  magnesium_mg:    { male: 400,  female: 310 },
+  phosphorus_mg:   { male: 700,  female: 700 },
+  potassium_mg:    { male: 3400, female: 2600 },
+  sodium_mg:       { male: 2300, female: 2300, isLimit: true }, // upper limit, not a target to reach
+  zinc_mg:         { male: 11,   female: 8 },
+  copper_mg:       { male: 0.9,  female: 0.9 },
+  manganese_mg:    { male: 2.3,  female: 1.8 },
+  selenium_ug:     { male: 55,   female: 55 },
+  // -- vitamins --
+  vitaminA_ug:       { male: 900, female: 700 },
+  vitaminC_mg:       { male: 90,  female: 75 },
+  vitaminD_ug:       { male: 15,  female: 15 },
+  vitaminE_mg:       { male: 15,  female: 15 },
+  vitaminK_ug:       { male: 120, female: 90 },
+  thiamin_mg:        { male: 1.2, female: 1.1 },
+  riboflavin_mg:     { male: 1.3, female: 1.1 },
+  niacin_mg:         { male: 16,  female: 14 },
+  vitaminB6_mg:      { male: 1.3, female: 1.3 },
+  folate_ug:         { male: 400, female: 400 },
+  vitaminB12_ug:     { male: 2.4, female: 2.4 },
+  biotin_ug:         { male: 30,  female: 30 },
+  pantothenicAcid_mg:{ male: 5,   female: 5 },
+  choline_mg:        { male: 550, female: 425 },
+};
+// Display order + friendly labels for the panel above
+const NUTRIENT_DISPLAY_LIST = [
+  ['mineral', 'calcium_mg', 'Calcium'],
+  ['mineral', 'iron_mg', 'Iron'],
+  ['mineral', 'magnesium_mg', 'Magnesium'],
+  ['mineral', 'phosphorus_mg', 'Phosphorus'],
+  ['mineral', 'potassium_mg', 'Potassium'],
+  ['mineral', 'sodium_mg', 'Sodium (daily limit)'],
+  ['mineral', 'zinc_mg', 'Zinc'],
+  ['mineral', 'copper_mg', 'Copper'],
+  ['mineral', 'manganese_mg', 'Manganese'],
+  ['mineral', 'selenium_ug', 'Selenium'],
+  ['vitamin', 'vitaminA_ug', 'Vitamin A'],
+  ['vitamin', 'vitaminC_mg', 'Vitamin C'],
+  ['vitamin', 'vitaminD_ug', 'Vitamin D'],
+  ['vitamin', 'vitaminE_mg', 'Vitamin E'],
+  ['vitamin', 'vitaminK_ug', 'Vitamin K'],
+  ['vitamin', 'thiamin_mg', 'Thiamin (B1)'],
+  ['vitamin', 'riboflavin_mg', 'Riboflavin (B2)'],
+  ['vitamin', 'niacin_mg', 'Niacin (B3)'],
+  ['vitamin', 'vitaminB6_mg', 'Vitamin B6'],
+  ['vitamin', 'folate_ug', 'Folate'],
+  ['vitamin', 'vitaminB12_ug', 'Vitamin B12'],
+  ['vitamin', 'biotin_ug', 'Biotin'],
+  ['vitamin', 'pantothenicAcid_mg', 'Pantothenic Acid (B5)'],
+  ['vitamin', 'choline_mg', 'Choline'],
+];
+
+// ---- Essential amino acid targets ----
+// WHO/FAO/UNU (2007) requirements, in mg per kg of body weight per day.
+// Multiply by the person's weight in kg to get their daily gram target.
+// Two pairs (sulfur-containing, aromatic) are conventionally given as a
+// combined requirement rather than split between the two amino acids.
+const AMINO_ACID_REQUIREMENTS_MG_PER_KG = {
+  histidine_g: 10,
+  isoleucine_g: 20,
+  leucine_g: 39,
+  lysine_g: 30,
+  threonine_g: 15,
+  tryptophan_g: 4,
+  valine_g: 26,
+};
+// Combined pairs: { keys: [...], requirement mg/kg }
+const AMINO_ACID_COMBINED_REQUIREMENTS = [
+  { keys: ['methionine_g', 'cystine_g'], mgPerKg: 15, label: 'Methionine + Cystine' },
+  { keys: ['phenylalanine_g', 'tyrosine_g'], mgPerKg: 25, label: 'Phenylalanine + Tyrosine' },
+];
+const AMINO_ACID_LABELS = {
+  histidine_g: 'Histidine', isoleucine_g: 'Isoleucine', leucine_g: 'Leucine',
+  lysine_g: 'Lysine', threonine_g: 'Threonine', tryptophan_g: 'Tryptophan',
+  valine_g: 'Valine',
+};
+// Non-essential amino acids: shown as informational totals only (no
+// established RDA to compare against).
+const NONESSENTIAL_AMINO_KEYS = {
+  arginine_g: 'Arginine', alanine_g: 'Alanine', asparticAcid_g: 'Aspartic acid',
+  glutamicAcid_g: 'Glutamic acid', glycine_g: 'Glycine', proline_g: 'Proline',
+  serine_g: 'Serine',
+};
+
+const MEALS = ['breakfast', 'lunch', 'dinner', 'snacks', 'supplements'];
+const MEAL_LABELS = {
+  breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
+  snacks: 'Snacks', supplements: 'Supplements'
+};
+
+// Build a lookup so we can find a food by id quickly instead of scanning
+// the whole FOODS array every time.
+const FOODS_BY_ID = {};
+FOODS.forEach(f => { FOODS_BY_ID[f.id] = f; });
+
+
+/* ================================================================
+   SECTION 2: STATE
+   `state` holds everything about the current profile and the
+   currently-viewed day. It's the single source of truth - every
+   render function below just reads from `state` and redraws the DOM.
+   ================================================================ */
+let state = {
+  profile: {
+    age: 30,
+    weightLbs: 150,
+    gender: 'male',
+    activity: 'moderate'
+  },
+  targets: {
+    calories: 2000,
+    protein_g: 100,
+    fat_g: 65,
+    carbs_g: 250
+  },
+  date: todayString(),
+  meals: {
+    breakfast: [], lunch: [], dinner: [], snacks: [], supplements: []
+  }
+};
+
+function todayString() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// ---- localStorage keys ----
+// Profile + targets are global (not per-day). Meals are saved per-day
+// under a key that includes the date, so switching days loads a
+// different meal log.
+const PROFILE_STORAGE_KEY = 'veganTracker_profile';
+const dayStorageKey = (dateStr) => 'veganTracker_day_' + dateStr;
+
+function saveProfileToStorage() {
+  localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify({
+    profile: state.profile,
+    targets: state.targets
+  }));
+}
+
+function loadProfileFromStorage() {
+  const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed.profile) state.profile = parsed.profile;
+    if (parsed.targets) state.targets = parsed.targets;
+  } catch (e) {
+    console.error('Could not read saved profile', e);
+  }
+}
+
+function saveDayToStorage() {
+  localStorage.setItem(dayStorageKey(state.date), JSON.stringify(state.meals));
+}
+
+function loadDayFromStorage(dateStr) {
+  const raw = localStorage.getItem(dayStorageKey(dateStr));
+  if (!raw) {
+    // No saved data for this day yet - start blank.
+    state.meals = { breakfast: [], lunch: [], dinner: [], snacks: [], supplements: [] };
+    return;
+  }
+  try {
+    state.meals = JSON.parse(raw);
+  } catch (e) {
+    console.error('Could not read saved day', e);
+    state.meals = { breakfast: [], lunch: [], dinner: [], snacks: [], supplements: [] };
+  }
+}
+
+
+/* ================================================================
+   SECTION 3: TARGET CALCULATIONS (calories, macros, RDAs)
+   ================================================================ */
+
+// Estimate resting calorie burn (BMR) from weight alone using the
+// WHO/Schofield weight-based equations. We use these (instead of the
+// more common Mifflin-St Jeor formula) because Mifflin-St Jeor needs
+// height, which this app doesn't collect. If you add a height field
+// later, swapping in Mifflin-St Jeor here would be a one-function change.
+function estimateBmr(weightKg, age, gender) {
+  if (gender === 'male') {
+    if (age < 30) return 15.3 * weightKg + 679;
+    if (age < 60) return 11.6 * weightKg + 879;
+    return 13.5 * weightKg + 487;
+  } else {
+    if (age < 30) return 14.7 * weightKg + 496;
+    if (age < 60) return 8.7 * weightKg + 829;
+    return 10.5 * weightKg + 596;
+  }
+}
+
+function lbsToKg(lbs) { return lbs * 0.453592; }
+
+// Recalculate calorie + macro targets from the current profile, and
+// push those values into state.targets and the sliders.
+function recalculateTargetsFromProfile() {
+  const { age, weightLbs, gender, activity } = state.profile;
+  const weightKg = lbsToKg(weightLbs);
+  const bmr = estimateBmr(weightKg, age, gender);
+  const calories = Math.round(bmr * ACTIVITY_MULTIPLIERS[activity]);
+
+  const proteinCals = calories * DEFAULT_MACRO_SPLIT.protein;
+  const fatCals = calories * DEFAULT_MACRO_SPLIT.fat;
+  const carbsCals = calories * DEFAULT_MACRO_SPLIT.carbs;
+
+  state.targets = {
+    calories: calories,
+    protein_g: Math.round(proteinCals / CALORIES_PER_GRAM.protein),
+    fat_g: Math.round(fatCals / CALORIES_PER_GRAM.fat),
+    carbs_g: Math.round(carbsCals / CALORIES_PER_GRAM.carbs)
+  };
+
+  saveProfileToStorage();
+  renderSliders();
+  renderNutrientProgress(); // amino acid targets depend on weight, so refresh these too
+}
+
+// Returns the gram-per-day target for an essential amino acid, scaled
+// to the person's body weight.
+function aminoAcidTargetGrams(mgPerKg) {
+  const weightKg = lbsToKg(state.profile.weightLbs);
+  return (mgPerKg * weightKg) / 1000;
+}
+
+
+/* ================================================================
+   SECTION 4: NUTRIENT TOTALING
+   Sums up everything logged today across all meals.
+   ================================================================ */
+
+// Returns a flat object of total nutrient amounts consumed today,
+// e.g. { calories_kcal: 1850, protein_g: 90, vitaminC_mg: 45, ... }
+function computeDailyTotals() {
+  const totals = {};
+  MEALS.forEach(mealKey => {
+    state.meals[mealKey].forEach(entry => {
+      const food = FOODS_BY_ID[entry.foodId];
+      if (!food) return; // food might be missing if the database changed
+      const scale = entry.grams / 100; // food data is per 100g
+      Object.entries(food.per100g).forEach(([nutrientKey, amountPer100]) => {
+        totals[nutrientKey] = (totals[nutrientKey] || 0) + amountPer100 * scale;
+      });
+    });
+  });
+  return totals;
+}
+
+
+/* ================================================================
+   SECTION 5: RENDERING
+   Each render function redraws one part of the page from `state`.
+   They're called after every change so the UI never gets out of
+   sync with the underlying data.
+   ================================================================ */
+
+function renderProfileForm() {
+  document.getElementById('inputAge').value = state.profile.age;
+  document.getElementById('inputWeight').value = state.profile.weightLbs;
+  document.getElementById('inputGender').value = state.profile.gender;
+  document.getElementById('inputActivity').value = state.profile.activity;
+}
+
+function renderSliders() {
+  const s = state.targets;
+  document.getElementById('sliderCalories').value = s.calories;
+  document.getElementById('sliderProtein').value = s.protein_g;
+  document.getElementById('sliderFat').value = s.fat_g;
+  document.getElementById('sliderCarbs').value = s.carbs_g;
+  document.getElementById('calorieValue').textContent = s.calories + ' kcal';
+  document.getElementById('proteinValue').textContent = s.protein_g + ' g';
+  document.getElementById('fatValue').textContent = s.fat_g + ' g';
+  document.getElementById('carbsValue').textContent = s.carbs_g + ' g';
+}
+
+// Builds one progress-bar row. `current` and `target` are numbers;
+// `unit` is just for display (mg, ug, g). `isLimit` flips the bar to
+// amber once you go over 100% (used for sodium, where "more" is bad,
+// not good).
+function buildBarRow(label, current, target, unit, isLimit) {
+  const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0;
+  const overLimit = isLimit && current > target;
+  return `
+    <div class="nutrient-row">
+      <div class="row-top">
+        <span class="name">${label}</span>
+        <span class="amounts">${round1(current)} / ${round1(target)} ${unit}</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill${overLimit ? ' over-limit' : ''}" style="width:${pct}%"></div>
+      </div>
+    </div>`;
+}
+
+function round1(n) { return Math.round(n * 10) / 10; }
+
+function renderNutrientProgress() {
+  const totals = computeDailyTotals();
+  const gender = state.profile.gender;
+  let html = '';
+
+  // --- Vitamins & minerals ---
+  html += '<div class="nutrient-section-title">Minerals</div>';
+  NUTRIENT_DISPLAY_LIST.filter(([group]) => group === 'mineral').forEach(([, key, label]) => {
+    const t = NUTRIENT_TARGETS[key];
+    html += buildBarRow(label, totals[key] || 0, t[gender], unitFromKey(key), !!t.isLimit);
+  });
+
+  html += '<div class="nutrient-section-title">Vitamins</div>';
+  NUTRIENT_DISPLAY_LIST.filter(([group]) => group === 'vitamin').forEach(([, key, label]) => {
+    const t = NUTRIENT_TARGETS[key];
+    html += buildBarRow(label, totals[key] || 0, t[gender], unitFromKey(key), false);
+  });
+
+  // --- Essential amino acids (target scales with body weight) ---
+  html += '<div class="nutrient-section-title">Essential Amino Acids</div>';
+  Object.entries(AMINO_ACID_REQUIREMENTS_MG_PER_KG).forEach(([key, mgPerKg]) => {
+    const target = aminoAcidTargetGrams(mgPerKg);
+    html += buildBarRow(AMINO_ACID_LABELS[key], totals[key] || 0, target, 'g', false);
+  });
+  AMINO_ACID_COMBINED_REQUIREMENTS.forEach(({ keys, mgPerKg, label }) => {
+    const target = aminoAcidTargetGrams(mgPerKg);
+    const current = keys.reduce((sum, k) => sum + (totals[k] || 0), 0);
+    html += buildBarRow(label, current, target, 'g', false);
+  });
+
+  // --- Non-essential amino acids: informational only, no target bar ---
+  html += '<div class="nutrient-section-title">Other Amino Acids (informational - no established target)</div>';
+  html += '<div style="font-size:0.85rem; color:var(--ink-soft); display:grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap:4px;">';
+  Object.entries(NONESSENTIAL_AMINO_KEYS).forEach(([key, label]) => {
+    html += `<div>${label}: ${round1(totals[key] || 0)} g</div>`;
+  });
+  html += '</div>';
+
+  document.getElementById('nutrientProgress').innerHTML = html;
+}
+
+// Nutrient keys carry their unit as a suffix (e.g. "_mg", "_ug", "_g")
+// so we can display the right unit without a second lookup table.
+function unitFromKey(key) {
+  if (key.endsWith('_mg')) return 'mg';
+  if (key.endsWith('_ug')) return 'mcg';
+  if (key.endsWith('_g')) return 'g';
+  return '';
+}
+
+// ---- Meal sections ----
+
+function renderMeals() {
+  const container = document.getElementById('mealsContainer');
+  container.innerHTML = MEALS.map(mealKey => buildMealBlockHtml(mealKey)).join('<hr style="border:none;border-top:1px solid var(--border);margin:18px 0;">');
+
+  // Wire up events for each meal block now that its HTML exists.
+  MEALS.forEach(mealKey => {
+    const searchInput = document.getElementById('search-' + mealKey);
+    searchInput.addEventListener('input', () => onFoodSearchInput(mealKey));
+    // Hide the dropdown when clicking elsewhere on the page.
+    document.addEventListener('click', (e) => {
+      const wrap = document.getElementById('searchResults-' + mealKey);
+      if (wrap && !wrap.contains(e.target) && e.target !== searchInput) {
+        wrap.innerHTML = '';
+      }
+    });
+  });
+}
+
+function buildMealBlockHtml(mealKey) {
+  const entries = state.meals[mealKey];
+  let rows = '';
+  if (entries.length === 0) {
+    rows = '<div class="empty-note">No foods added yet.</div>';
+  } else {
+    rows = `<table class="food-table">
+      <thead><tr><th>Food</th><th>Grams</th><th>Calories</th><th></th></tr></thead>
+      <tbody>` +
+      entries.map((entry, idx) => buildFoodRowHtml(mealKey, entry, idx)).join('') +
+      `</tbody></table>`;
+  }
+
+  return `
+    <div class="meal-block">
+      <h3>${MEAL_LABELS[mealKey]}</h3>
+      <div class="food-search-wrap">
+        <input type="text" id="search-${mealKey}" placeholder="Search foods to add...">
+        <div class="search-results" id="searchResults-${mealKey}"></div>
+      </div>
+      <div id="rows-${mealKey}">${rows}</div>
+    </div>`;
+}
+
+function buildFoodRowHtml(mealKey, entry, idx) {
+  const food = FOODS_BY_ID[entry.foodId];
+  if (!food) return '';
+  const calories = round1((food.per100g.calories_kcal || 0) * entry.grams / 100);
+  return `
+    <tr>
+      <td>${food.name}</td>
+      <td>
+        <div class="gram-control">
+          <button class="small" onclick="adjustGrams('${mealKey}', ${idx}, -10)">-</button>
+          <input type="number" value="${entry.grams}" min="0" step="1"
+                 onchange="setGrams('${mealKey}', ${idx}, this.value)">
+          <button class="small" onclick="adjustGrams('${mealKey}', ${idx}, 10)">+</button>
+        </div>
+      </td>
+      <td>${calories}</td>
+      <td><button class="remove-btn" onclick="removeFood('${mealKey}', ${idx})">&times;</button></td>
+    </tr>`;
+}
+
+// ---- Food search (simple case-insensitive substring match, capped
+// at 25 results so the dropdown stays fast and short even though
+// FOODS has 3,000+ entries) ----
+function onFoodSearchInput(mealKey) {
+  const input = document.getElementById('search-' + mealKey);
+  const query = input.value.trim().toLowerCase();
+  const resultsDiv = document.getElementById('searchResults-' + mealKey);
+  if (query.length < 2) {
+    resultsDiv.innerHTML = '';
+    return;
+  }
+  const matches = FOODS.filter(f => f.name.toLowerCase().includes(query)).slice(0, 25);
+  resultsDiv.innerHTML = matches.map(f =>
+    `<div onclick="addFood('${mealKey}', ${f.id})">${f.name}</div>`
+  ).join('');
+}
+
+function addFood(mealKey, foodId) {
+  state.meals[mealKey].push({ foodId: foodId, grams: 100 }); // default to 100g
+  document.getElementById('search-' + mealKey).value = '';
+  document.getElementById('searchResults-' + mealKey).innerHTML = '';
+  afterMealsChanged();
+}
+
+function removeFood(mealKey, idx) {
+  state.meals[mealKey].splice(idx, 1);
+  afterMealsChanged();
+}
+
+function adjustGrams(mealKey, idx, delta) {
+  const entry = state.meals[mealKey][idx];
+  entry.grams = Math.max(0, entry.grams + delta);
+  afterMealsChanged();
+}
+
+function setGrams(mealKey, idx, value) {
+  const grams = Math.max(0, parseFloat(value) || 0);
+  state.meals[mealKey][idx].grams = grams;
+  afterMealsChanged();
+}
+
+// Called after any change to meals: re-render the affected pieces,
+// then persist to localStorage.
+function afterMealsChanged() {
+  renderMeals();
+  renderNutrientProgress();
+  saveDayToStorage();
+}
+
+
+/* ================================================================
+   SECTION 6: EXPORT (JSON / CSV / plain text)
+   ================================================================ */
+
+function triggerDownload(filename, content, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Builds a plain description of today's log shared by all three export
+// formats, so each exporter just needs to format this the same data.
+function buildExportData() {
+  const mealsExpanded = {};
+  MEALS.forEach(mealKey => {
+    mealsExpanded[mealKey] = state.meals[mealKey].map(entry => {
+      const food = FOODS_BY_ID[entry.foodId];
+      return {
+        name: food ? food.name : 'Unknown food',
+        grams: entry.grams,
+        calories: food ? round1((food.per100g.calories_kcal || 0) * entry.grams / 100) : 0
+      };
+    });
+  });
+  return {
+    date: state.date,
+    targets: state.targets,
+    totals: computeDailyTotals(),
+    meals: mealsExpanded
+  };
+}
+
+function exportJson() {
+  const data = buildExportData();
+  triggerDownload(`vegan-tracker-${state.date}.json`, JSON.stringify(data, null, 2), 'application/json');
+}
+
+function exportCsv() {
+  const data = buildExportData();
+  let lines = ['Meal,Food,Grams,Calories'];
+  MEALS.forEach(mealKey => {
+    data.meals[mealKey].forEach(item => {
+      // Wrap the food name in quotes in case it contains a comma.
+      lines.push(`${MEAL_LABELS[mealKey]},"${item.name}",${item.grams},${item.calories}`);
+    });
+  });
+  triggerDownload(`vegan-tracker-${state.date}.csv`, lines.join('\n'), 'text/csv');
+}
+
+function exportText() {
+  const data = buildExportData();
+  let out = `Vegan Nutrition Tracker - ${data.date}\n`;
+  out += '='.repeat(40) + '\n\n';
+  MEALS.forEach(mealKey => {
+    out += MEAL_LABELS[mealKey] + ':\n';
+    if (data.meals[mealKey].length === 0) {
+      out += '  (nothing logged)\n';
+    } else {
+      data.meals[mealKey].forEach(item => {
+        out += `  - ${item.name}: ${item.grams}g (${item.calories} kcal)\n`;
+      });
+    }
+    out += '\n';
+  });
+  out += 'Daily totals:\n';
+  out += `  Calories: ${round1(data.totals.calories_kcal || 0)} / ${data.targets.calories} kcal\n`;
+  out += `  Protein: ${round1(data.totals.protein_g || 0)} / ${data.targets.protein_g} g\n`;
+  out += `  Fat: ${round1(data.totals.fat_g || 0)} / ${data.targets.fat_g} g\n`;
+  out += `  Carbs: ${round1(data.totals.carbs_g || 0)} / ${data.targets.carbs_g} g\n`;
+  triggerDownload(`vegan-tracker-${state.date}.txt`, out, 'text/plain');
+}
+
+
+/* ================================================================
+   SECTION 7: WIRE UP TOP-LEVEL CONTROLS + INIT
+   ================================================================ */
+
+function wireProfileControls() {
+  document.getElementById('inputAge').addEventListener('change', e => {
+    state.profile.age = parseInt(e.target.value) || 0;
+    saveProfileToStorage();
+  });
+  document.getElementById('inputWeight').addEventListener('change', e => {
+    state.profile.weightLbs = parseFloat(e.target.value) || 0;
+    saveProfileToStorage();
+  });
+  document.getElementById('inputGender').addEventListener('change', e => {
+    state.profile.gender = e.target.value;
+    saveProfileToStorage();
+    renderNutrientProgress(); // targets differ by gender
+  });
+  document.getElementById('inputActivity').addEventListener('change', e => {
+    state.profile.activity = e.target.value;
+    saveProfileToStorage();
+  });
+  document.getElementById('btnRecalc').addEventListener('click', recalculateTargetsFromProfile);
+
+  // Sliders just write straight into state.targets as they move.
+  document.getElementById('sliderCalories').addEventListener('input', e => {
+    state.targets.calories = parseInt(e.target.value);
+    document.getElementById('calorieValue').textContent = state.targets.calories + ' kcal';
+    saveProfileToStorage();
+    renderNutrientProgress();
+  });
+  document.getElementById('sliderProtein').addEventListener('input', e => {
+    state.targets.protein_g = parseInt(e.target.value);
+    document.getElementById('proteinValue').textContent = state.targets.protein_g + ' g';
+    saveProfileToStorage();
+    renderNutrientProgress();
+  });
+  document.getElementById('sliderFat').addEventListener('input', e => {
+    state.targets.fat_g = parseInt(e.target.value);
+    document.getElementById('fatValue').textContent = state.targets.fat_g + ' g';
+    saveProfileToStorage();
+    renderNutrientProgress();
+  });
+  document.getElementById('sliderCarbs').addEventListener('input', e => {
+    state.targets.carbs_g = parseInt(e.target.value);
+    document.getElementById('carbsValue').textContent = state.targets.carbs_g + ' g';
+    saveProfileToStorage();
+    renderNutrientProgress();
+  });
+}
+
+function wireDayPicker() {
+  const picker = document.getElementById('dayPicker');
+  picker.value = state.date;
+  picker.addEventListener('change', e => {
+    state.date = e.target.value;
+    loadDayFromStorage(state.date);
+    renderMeals();
+    renderNutrientProgress();
+  });
+}
+
+function wireExportButtons() {
+  document.getElementById('btnExportJson').addEventListener('click', exportJson);
+  document.getElementById('btnExportCsv').addEventListener('click', exportCsv);
+  document.getElementById('btnExportText').addEventListener('click', exportText);
+}
+
+function init() {
+  loadProfileFromStorage();
+  loadDayFromStorage(state.date);
+
+  renderProfileForm();
+  renderSliders();
+  wireProfileControls();
+  wireDayPicker();
+  wireExportButtons();
+  renderMeals();
+  renderNutrientProgress();
+}
+
+init();
+</script>
+</body>
+</html>
