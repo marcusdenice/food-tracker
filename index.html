@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vegan Nutrition Tracker</title>
+<title>Nutrition Tracker</title>
 
 <style>
   /* ============================================================
@@ -108,6 +108,15 @@
   .food-group h3 {
     font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--mustard);
     margin: 0 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .remove-category-btn {
+    background: none; border: none; color: var(--rust); font-size: 1rem; padding: 0 4px;
+    cursor: pointer; text-transform: none; letter-spacing: 0; font-family: var(--font-body);
+  }
+  .remove-category-btn:hover { text-decoration: underline; }
+  .hidden-categories-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px;
   }
   .food-search-wrap {
     position: relative;
@@ -177,14 +186,19 @@
   .nutrient-tooltip {
     position: fixed; z-index: 300; display: none;
     background: var(--paper-raised); border: 1px solid var(--line); border-radius: 4px;
-    padding: 10px 12px; font-size: 12px; max-width: 260px;
+    padding: 10px 12px; font-size: 12px; max-width: 280px;
     box-shadow: 0 4px 14px rgba(0,0,0,0.18); pointer-events: none;
   }
   .nutrient-tooltip.visible { display: block; }
+  .nutrient-tooltip .tooltip-title {
+    font-family: var(--font-display); font-size: 14px; color: var(--moss-deep);
+    border-bottom: 1px solid var(--line); padding-bottom: 4px; margin-bottom: 8px;
+  }
   .nutrient-tooltip h5 {
     margin: 0 0 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;
     color: var(--moss-deep);
   }
+  .nutrient-tooltip p.tooltip-desc { margin: 0 0 10px; line-height: 1.4; }
   .nutrient-tooltip ul { margin: 0 0 10px; padding-left: 16px; }
   .nutrient-tooltip ul:last-child { margin-bottom: 0; }
   .nutrient-tooltip li { margin-bottom: 2px; }
@@ -202,7 +216,7 @@
 <body>
 
 <header>
-  <h1>Vegan Nutrition Tracker</h1>
+  <h1>Nutrition Tracker</h1>
   <div class="tagline">Dial in calories &amp; macros, add whole foods by the gram, watch every target move live. Built on the full USDA SR Legacy database.</div>
 </header>
 
@@ -235,7 +249,7 @@
       </div>
       <div class="field">
         <label for="inputActivity">Activity</label>
-        <select id="inputActivity" style="width:170px;">
+        <select id="inputActivity" style="width:210px;">
           <option value="sedentary">Sedentary</option>
           <option value="light">Light (1-3 days/wk)</option>
           <option value="moderate">Moderate (3-5 days/wk)</option>
@@ -264,24 +278,39 @@
         <div class="sub">kcal / day</div>
       </div>
       <div class="macro-box">
-        <div class="mlabel"><span class="name">Protein</span><span class="val" id="proteinValue"></span></div>
-        <input type="range" id="sliderProtein" min="0" max="400" step="1">
-        <div class="sub" id="proteinPct">&mdash; kcal &middot; &mdash;%</div>
+        <div class="mlabel"><span class="name">Protein</span><span class="val" id="proteinPctValue"></span></div>
+        <div class="gram-control" style="justify-content:center;">
+          <button onclick="adjustMacroPercent('protein', -1)">-</button>
+          <input type="number" id="inputProteinPct" min="0" max="100" step="1"
+                 onchange="setMacroPercent('protein', this.value)">
+          <button onclick="adjustMacroPercent('protein', 1)">+</button>
+        </div>
+        <div class="sub" id="proteinGramsInfo"></div>
       </div>
       <div class="macro-box">
-        <div class="mlabel"><span class="name">Carbs</span><span class="val" id="carbsValue"></span></div>
-        <input type="range" id="sliderCarbs" min="0" max="700" step="1">
-        <div class="sub" id="carbsPct">&mdash; kcal &middot; &mdash;%</div>
+        <div class="mlabel"><span class="name">Carbs</span><span class="val" id="carbsPctValue"></span></div>
+        <div class="gram-control" style="justify-content:center;">
+          <button onclick="adjustMacroPercent('carbs', -1)">-</button>
+          <input type="number" id="inputCarbsPct" min="0" max="100" step="1"
+                 onchange="setMacroPercent('carbs', this.value)">
+          <button onclick="adjustMacroPercent('carbs', 1)">+</button>
+        </div>
+        <div class="sub" id="carbsGramsInfo"></div>
       </div>
       <div class="macro-box">
-        <div class="mlabel"><span class="name">Fat</span><span class="val" id="fatValue"></span></div>
-        <input type="range" id="sliderFat" min="0" max="300" step="1">
-        <div class="sub" id="fatPct">&mdash; kcal &middot; &mdash;%</div>
+        <div class="mlabel"><span class="name">Fat</span><span class="val" id="fatPctValue"></span></div>
+        <div class="gram-control" style="justify-content:center;">
+          <button onclick="adjustMacroPercent('fat', -1)">-</button>
+          <input type="number" id="inputFatPct" min="0" max="100" step="1"
+                 onchange="setMacroPercent('fat', this.value)">
+          <button onclick="adjustMacroPercent('fat', 1)">+</button>
+        </div>
+        <div class="sub" id="fatGramsInfo"></div>
       </div>
     </div>
     <div class="cal-total-line">
-      <span>Macro sliders sum to: <span class="big" id="macroSum"></span> kcal</span>
-      <span class="hint">Move Calories to rescale all three proportionally - or move any macro slider directly and Calories will follow.</span>
+      <span>Protein + Carbs + Fat = <span class="big" id="macroPctSum"></span>%</span>
+      <span class="hint">Adjusting one percentage rescales the other two automatically, so they always add up to 100%.</span>
     </div>
   </div>
 
@@ -505,12 +534,25 @@ let state = {
   },
   targets: {
     calories: 2000,
+    // proteinPct/fatPct/carbsPct are the source of truth for the macro
+    // split and always sum to 100. protein_g/fat_g/carbs_g are DERIVED
+    // from these percentages and the calorie target (recomputed by
+    // recomputeMacroGramsFromPercents whenever either changes) - kept
+    // around so the rest of the app (amino acid targets, gauge bars,
+    // export) can keep comparing against plain gram amounts.
+    proteinPct: 20,
+    fatPct: 30,
+    carbsPct: 50,
     protein_g: 100,
     fat_g: 65,
     carbs_g: 250
   },
   // Purely cosmetic: only used to name downloaded export files.
   label: '',
+  // Categories the person has removed from view via the x button. Kept
+  // separate from the food log itself - hiding a category just declutters
+  // the "Your Foods" panel, it doesn't delete anything already logged in it.
+  hiddenBuckets: [],
   entries: {}
 };
 BUCKET_KEYS.forEach(b => state.entries[b] = []);
@@ -530,7 +572,7 @@ const ENTRIES_STORAGE_KEY = 'veganTracker_entries';
 
 function saveProfileToStorage() {
   localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify({
-    profile: state.profile, targets: state.targets, label: state.label
+    profile: state.profile, targets: state.targets, label: state.label, hiddenBuckets: state.hiddenBuckets
   }));
 }
 function loadProfileFromStorage() {
@@ -541,7 +583,30 @@ function loadProfileFromStorage() {
     if (parsed.profile) state.profile = parsed.profile;
     if (parsed.targets) state.targets = parsed.targets;
     if (typeof parsed.label === 'string') state.label = parsed.label;
+    if (Array.isArray(parsed.hiddenBuckets)) state.hiddenBuckets = parsed.hiddenBuckets;
   } catch (e) { console.error('Could not read saved profile', e); }
+
+  // Migration: older saved profiles only stored protein_g/fat_g/carbs_g,
+  // from before percentages existed. If proteinPct etc. are missing,
+  // back-calculate them from the saved grams so existing targets survive
+  // the upgrade instead of silently resetting to the default 20/30/50 split.
+  const t = state.targets;
+  if (typeof t.proteinPct !== 'number' || typeof t.fatPct !== 'number' || typeof t.carbsPct !== 'number') {
+    const proteinCals = (t.protein_g || 0) * CALORIES_PER_GRAM.protein;
+    const fatCals = (t.fat_g || 0) * CALORIES_PER_GRAM.fat;
+    const carbsCals = (t.carbs_g || 0) * CALORIES_PER_GRAM.carbs;
+    const totalCals = proteinCals + fatCals + carbsCals;
+    if (totalCals > 0) {
+      t.proteinPct = Math.round(proteinCals / totalCals * 100);
+      t.fatPct = Math.round(fatCals / totalCals * 100);
+      t.carbsPct = 100 - t.proteinPct - t.fatPct; // absorbs rounding so it's always exact
+    } else {
+      t.proteinPct = Math.round(DEFAULT_MACRO_SPLIT.protein * 100);
+      t.fatPct = Math.round(DEFAULT_MACRO_SPLIT.fat * 100);
+      t.carbsPct = 100 - t.proteinPct - t.fatPct;
+    }
+    recomputeMacroGramsFromPercents();
+  }
 }
 function saveEntriesToStorage() {
   localStorage.setItem(ENTRIES_STORAGE_KEY, JSON.stringify(state.entries));
@@ -570,10 +635,14 @@ function estimateBmr(weightKg, heightCm, age, gender) {
   return gender === 'male' ? base + 5 : base - 161;
 }
 
-function macroCaloriesFromTargets(t) {
-  return t.protein_g * CALORIES_PER_GRAM.protein +
-         t.fat_g * CALORIES_PER_GRAM.fat +
-         t.carbs_g * CALORIES_PER_GRAM.carbs;
+// protein_g/fat_g/carbs_g are derived from the percentage split and the
+// current calorie target - call this any time either one changes so the
+// cached gram values (used everywhere else in the app) stay in sync.
+function recomputeMacroGramsFromPercents() {
+  const t = state.targets;
+  t.protein_g = Math.round(t.calories * t.proteinPct / 100 / CALORIES_PER_GRAM.protein);
+  t.fat_g = Math.round(t.calories * t.fatPct / 100 / CALORIES_PER_GRAM.fat);
+  t.carbs_g = Math.round(t.calories * t.carbsPct / 100 / CALORIES_PER_GRAM.carbs);
 }
 
 function recalculateTargetsFromProfile() {
@@ -583,19 +652,57 @@ function recalculateTargetsFromProfile() {
   const bmr = estimateBmr(weightKg, heightCm, age, gender);
   const calories = Math.round(bmr * ACTIVITY_MULTIPLIERS[activity]);
 
-  const proteinCals = calories * DEFAULT_MACRO_SPLIT.protein;
-  const fatCals = calories * DEFAULT_MACRO_SPLIT.fat;
-  const carbsCals = calories * DEFAULT_MACRO_SPLIT.carbs;
-
-  state.targets = {
-    calories: calories,
-    protein_g: Math.round(proteinCals / CALORIES_PER_GRAM.protein),
-    fat_g: Math.round(fatCals / CALORIES_PER_GRAM.fat),
-    carbs_g: Math.round(carbsCals / CALORIES_PER_GRAM.carbs)
-  };
+  state.targets.calories = calories;
+  state.targets.proteinPct = Math.round(DEFAULT_MACRO_SPLIT.protein * 100);
+  state.targets.fatPct = Math.round(DEFAULT_MACRO_SPLIT.fat * 100);
+  state.targets.carbsPct = 100 - state.targets.proteinPct - state.targets.fatPct; // absorbs any rounding
+  recomputeMacroGramsFromPercents();
 
   saveProfileToStorage();
   renderSliders();
+  renderNutrientProgress();
+}
+
+// ---- Percentage steppers for protein/fat/carbs ----
+// Changing one percentage rescales the OTHER TWO proportionally (keeping
+// their existing ratio to each other) so all three always sum to exactly
+// 100 - the same idea as the old calorie/macro slider linking, just
+// applied to percentages instead of grams.
+const MACRO_PCT_KEYS = { protein: 'proteinPct', fat: 'fatPct', carbs: 'carbsPct' };
+
+function adjustMacroPercent(macro, delta) {
+  const key = MACRO_PCT_KEYS[macro];
+  setMacroPercent(macro, state.targets[key] + delta);
+}
+
+function setMacroPercent(macro, rawValue) {
+  const key = MACRO_PCT_KEYS[macro];
+  const others = Object.keys(MACRO_PCT_KEYS).filter(m => m !== macro);
+  const otherKeys = others.map(m => MACRO_PCT_KEYS[m]);
+
+  const newValue = clamp(Math.round(parseFloat(rawValue) || 0), 0, 100);
+  const remaining = 100 - newValue;
+  const currentOtherSum = otherKeys.reduce((sum, k) => sum + state.targets[k], 0);
+
+  let newOtherValues;
+  if (currentOtherSum > 0) {
+    const scale = remaining / currentOtherSum;
+    const first = Math.round(state.targets[otherKeys[0]] * scale);
+    const second = remaining - first; // remainder goes here so the total is always exact
+    newOtherValues = [first, second];
+  } else {
+    // Both other macros are already at 0% - split the remainder evenly.
+    const first = Math.round(remaining / 2);
+    newOtherValues = [first, remaining - first];
+  }
+
+  state.targets[key] = newValue;
+  state.targets[otherKeys[0]] = clamp(newOtherValues[0], 0, 100);
+  state.targets[otherKeys[1]] = 100 - newValue - state.targets[otherKeys[0]];
+
+  recomputeMacroGramsFromPercents();
+  renderSliders();
+  saveProfileToStorage();
   renderNutrientProgress();
 }
 
@@ -651,21 +758,109 @@ function nutrientContributionBreakdown(keys) {
     .sort((a, b) => b.amount - a.amount);
 }
 
-// Which foods in the WHOLE database are richest in these nutrient key(s)
-// per 100g - a quick reference for "what should I add more/less of".
-function topFoodsForNutrient(keys, count) {
-  return FOODS
-    .map(f => ({ name: f.name, value: keys.reduce((sum, k) => sum + (f.per100g[k] || 0), 0) }))
-    .filter(f => f.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, count);
-}
+// ---- Curated, general-purpose nutrient reference info ----
+// Both dictionaries are keyed by the same comma-joined key string used in
+// each row's data-nutrient-key attribute (single nutrients use their own
+// key; combined amino acid pairs use "key1,key2").
+// Recommended sources deliberately list general FOOD TYPES ("leafy greens",
+// "legumes") rather than specific database entries, since the point is to
+// give a person a shopping-list-style mental model, not a search result.
+const NUTRIENT_FUNCTIONS = {
+  calories_kcal: 'Provides the energy your body needs for basic function, movement, and activity.',
+  protein_g: 'Builds and repairs muscle, skin, and other tissues, and supports enzymes and hormones.',
+  carbs_g: "The body's main energy source, especially for the brain and during exercise.",
+  fat_g: 'Supplies concentrated energy, supports cell membranes, and helps absorb vitamins A, D, E and K.',
+  fiber_g: 'Supports digestion, feeds gut bacteria, and helps regulate blood sugar and cholesterol.',
+  thiamin_mg: 'Helps convert food into energy and supports nerve function.',
+  riboflavin_mg: 'Helps convert food into energy and supports skin, eye, and nerve health.',
+  niacin_mg: 'Supports energy metabolism and helps maintain healthy skin and the nervous system.',
+  histidine_g: 'Used to make histamine and helps maintain the protective tissue around nerve cells.',
+  isoleucine_g: 'Supports muscle metabolism, immune function, and energy regulation.',
+  leucine_g: 'Triggers muscle protein synthesis and helps regulate blood sugar and wound healing.',
+  lysine_g: 'Supports protein synthesis, hormone production, and calcium absorption.',
+  threonine_g: 'Supports collagen and elastin production, and immune and liver function.',
+  tryptophan_g: 'A building block for serotonin and melatonin, supporting mood and sleep.',
+  valine_g: 'Supports muscle growth, tissue repair, and energy production.',
+  'methionine_g,cystine_g': 'Sulfur-containing amino acids used to build proteins and antioxidants like glutathione.',
+  'phenylalanine_g,tyrosine_g': 'Used to build proteins and neurotransmitters, including dopamine and thyroid hormone.',
+  calcium_mg: 'Builds and maintains bones and teeth, and supports muscle and nerve signaling.',
+  iron_mg: 'Carries oxygen in red blood cells; low intake can lead to fatigue and anemia.',
+  magnesium_mg: 'Supports muscle and nerve function, blood sugar control, and bone health.',
+  phosphorus_mg: 'Works with calcium to build bones and teeth, and helps cells produce energy.',
+  potassium_mg: 'Helps regulate fluid balance, muscle contractions, and heart rhythm.',
+  sodium_mg: 'Regulates fluid balance and nerve signaling - most people get too much, not too little.',
+  zinc_mg: 'Supports immune function, wound healing, and taste and smell.',
+  copper_mg: 'Helps form red blood cells and connective tissue, and supports iron absorption.',
+  manganese_mg: 'Supports bone formation and helps the body process cholesterol and carbohydrates.',
+  selenium_ug: 'An antioxidant that supports thyroid function and immune health.',
+  vitaminA_ug: 'Supports vision, immune function, and skin health.',
+  vitaminC_mg: 'An antioxidant that supports immune function, skin health, and iron absorption.',
+  vitaminD_ug: 'Supports calcium absorption and bone health, and plays a role in immune function.',
+  vitaminE_mg: 'An antioxidant that protects cells from damage and supports immune function.',
+  vitaminK_ug: 'Needed for blood clotting and supports bone health.',
+  folate_ug: 'Supports cell division and DNA synthesis; especially important before and during pregnancy.',
+  vitaminB6_mg: 'Supports protein metabolism, red blood cell production, and brain development.',
+  vitaminB12_ug: 'Supports nerve function and red blood cell formation; naturally found almost only in animal foods.',
+  biotin_ug: 'Supports metabolism of fats, carbs, and protein, and helps maintain healthy hair and skin.',
+  pantothenicAcid_mg: 'Helps convert food into energy and supports hormone production.',
+  choline_mg: 'Supports brain development, liver function, and cell membrane structure.',
+};
+
+const FOOD_SOURCE_SUGGESTIONS = {
+  calories_kcal: ['Nuts & seeds', 'Oils', 'Whole grains', 'Dried fruit', 'Legumes'],
+  protein_g: ['Legumes (beans, lentils)', 'Tofu & tempeh', 'Seitan', 'Nuts & seeds', 'Whole grains', 'Meat, poultry & fish (if eaten)'],
+  carbs_g: ['Whole grains', 'Starchy vegetables (potatoes, corn)', 'Fruit', 'Legumes'],
+  fat_g: ['Nuts & seeds', 'Cooking oils', 'Avocado', 'Fatty fish (if eaten)'],
+  fiber_g: ['Legumes', 'Whole grains', 'Vegetables', 'Fruit with the skin on', 'Nuts & seeds'],
+  thiamin_mg: ['Whole grains', 'Legumes', 'Sunflower seeds', 'Fortified cereals', 'Pork (if eaten)'],
+  riboflavin_mg: ['Leafy greens', 'Almonds', 'Fortified cereals', 'Dairy & eggs (if eaten)'],
+  niacin_mg: ['Peanuts', 'Whole grains', 'Mushrooms', 'Meat, poultry & fish (if eaten)'],
+  histidine_g: ['Soy foods', 'Legumes', 'Whole grains', 'Nuts & seeds', 'Meat & dairy (if eaten)'],
+  isoleucine_g: ['Soy foods', 'Legumes', 'Nuts & seeds', 'Eggs & dairy (if eaten)'],
+  leucine_g: ['Soy foods', 'Legumes', 'Nuts & seeds', 'Whole grains', 'Meat & dairy (if eaten)'],
+  lysine_g: ['Legumes (lentils, beans, chickpeas)', 'Quinoa', 'Soy foods', 'Pistachios'],
+  threonine_g: ['Legumes', 'Soy foods', 'Nuts & seeds', 'Whole grains'],
+  tryptophan_g: ['Soy foods', 'Oats', 'Pumpkin & sesame seeds', 'Legumes'],
+  valine_g: ['Soy foods', 'Legumes', 'Nuts & seeds', 'Whole grains'],
+  'methionine_g,cystine_g': ['Whole grains (oats, corn)', 'Brazil nuts & sunflower seeds', 'Soy foods', 'Meat & dairy (if eaten)'],
+  'phenylalanine_g,tyrosine_g': ['Soy foods', 'Legumes', 'Nuts & seeds', 'Whole grains', 'Meat & dairy (if eaten)'],
+  calcium_mg: ['Fortified plant milks', 'Calcium-set tofu', 'Leafy greens (kale, bok choy)', 'Sesame seeds & tahini', 'Dairy (if eaten)'],
+  iron_mg: ['Legumes', 'Dark leafy greens', 'Pumpkin seeds', 'Quinoa', 'Dried fruit', 'Fortified cereals'],
+  magnesium_mg: ['Nuts & seeds', 'Legumes', 'Whole grains', 'Dark leafy greens', 'Dark chocolate'],
+  phosphorus_mg: ['Legumes', 'Nuts & seeds', 'Whole grains', 'Dairy & eggs (if eaten)'],
+  potassium_mg: ['Leafy greens', 'Potatoes & sweet potatoes', 'Bananas', 'Legumes', 'Winter squash'],
+  sodium_mg: ['Processed & packaged foods', 'Canned goods', 'Condiments & sauces', 'Restaurant & fast food'],
+  zinc_mg: ['Legumes', 'Pumpkin & cashew seeds', 'Whole grains', 'Meat & shellfish (if eaten)'],
+  copper_mg: ['Nuts & seeds', 'Legumes', 'Whole grains', 'Mushrooms', 'Dark chocolate'],
+  manganese_mg: ['Whole grains', 'Nuts & seeds', 'Legumes', 'Leafy greens', 'Tea'],
+  selenium_ug: ['Brazil nuts', 'Whole grains', 'Legumes', 'Sunflower seeds'],
+  vitaminA_ug: ['Orange vegetables (carrots, sweet potato)', 'Leafy greens', 'Winter squash', 'Mango & cantaloupe'],
+  vitaminC_mg: ['Citrus fruit', 'Bell peppers', 'Berries', 'Broccoli & Brussels sprouts', 'Kiwi'],
+  vitaminD_ug: ['Fortified plant milks & cereals', 'UV-exposed mushrooms', 'Sunlight (not a food, but the main source)'],
+  vitaminE_mg: ['Nuts & seeds', 'Vegetable oils', 'Leafy greens', 'Avocado'],
+  vitaminK_ug: ['Leafy greens (kale, spinach)', 'Broccoli & Brussels sprouts', 'Vegetable oils'],
+  folate_ug: ['Leafy greens', 'Legumes', 'Asparagus', 'Fortified grains', 'Citrus fruit'],
+  vitaminB6_mg: ['Chickpeas', 'Potatoes', 'Bananas', 'Fortified cereals', 'Whole grains'],
+  vitaminB12_ug: ['Fortified plant milks & cereals', 'Nutritional yeast', 'Dairy & eggs (if eaten)', 'Meat (if eaten)'],
+  biotin_ug: ['Nuts & seeds', 'Legumes', 'Whole grains', 'Egg yolk (if eaten)'],
+  pantothenicAcid_mg: ['Whole grains', 'Legumes', 'Mushrooms', 'Avocado'],
+  choline_mg: ['Soy foods', 'Cruciferous vegetables', 'Quinoa', 'Eggs (if eaten)'],
+};
 
 function buildNutrientTooltipHtml(keys, label, unit) {
+  const keyString = keys.join(',');
   const breakdown = nutrientContributionBreakdown(keys);
-  const topFoods = topFoodsForNutrient(keys, 6);
+  const suggestions = FOOD_SOURCE_SUGGESTIONS[keyString] || [];
+  const description = NUTRIENT_FUNCTIONS[keyString] || '';
 
-  let html = `<h5>Today's ${label} Sources</h5>`;
+  let html = `<div class="tooltip-title">${label}</div>`;
+
+  html += `<h5>Function</h5>`;
+  html += description
+    ? `<p class="tooltip-desc">${description}</p>`
+    : `<p class="tooltip-desc muted">No description yet.</p>`;
+
+  html += `<h5>Entered Sources</h5>`;
   if (breakdown.length === 0) {
     html += `<div class="muted">Nothing logged yet contributes to this.</div>`;
   } else {
@@ -673,8 +868,12 @@ function buildNutrientTooltipHtml(keys, label, unit) {
       `<li>${b.name}: ${b.percent.toFixed(0)}% (${fmt(b.amount)} ${unit})</li>`
     ).join('') + '</ul>';
   }
-  html += `<h5>Foods High in ${label}</h5>`;
-  html += '<ul>' + topFoods.map(f => `<li>${f.name}</li>`).join('') + '</ul>';
+
+  html += `<h5>Recommended Sources</h5>`;
+  html += suggestions.length > 0
+    ? '<ul>' + suggestions.map(s => `<li>${s}</li>`).join('') + '</ul>'
+    : `<div class="muted">No general sources listed yet.</div>`;
+
   return html;
 }
 
@@ -682,7 +881,7 @@ function positionTooltip(tooltip, row) {
   const rect = row.getBoundingClientRect();
   tooltip.style.top = (rect.bottom + 6) + 'px';
   let left = rect.left;
-  const maxLeft = window.innerWidth - 272;
+  const maxLeft = window.innerWidth - 292;
   if (left > maxLeft) left = Math.max(8, maxLeft);
   tooltip.style.left = left + 'px';
 }
@@ -747,22 +946,20 @@ function renderProfileForm() {
 function renderSliders() {
   const s = state.targets;
   document.getElementById('sliderCalories').value = s.calories;
-  document.getElementById('sliderProtein').value = s.protein_g;
-  document.getElementById('sliderFat').value = s.fat_g;
-  document.getElementById('sliderCarbs').value = s.carbs_g;
   document.getElementById('calVal').textContent = s.calories;
-  document.getElementById('proteinValue').textContent = s.protein_g + ' g';
-  document.getElementById('fatValue').textContent = s.fat_g + ' g';
-  document.getElementById('carbsValue').textContent = s.carbs_g + ' g';
 
-  const kp = s.protein_g * CALORIES_PER_GRAM.protein;
-  const kc = s.carbs_g * CALORIES_PER_GRAM.carbs;
-  const kf = s.fat_g * CALORIES_PER_GRAM.fat;
-  const ktotal = kp + kc + kf;
-  document.getElementById('proteinPct').textContent = `${kp} kcal \u00b7 ${ktotal ? (kp/ktotal*100).toFixed(0) : 0}%`;
-  document.getElementById('carbsPct').textContent = `${kc} kcal \u00b7 ${ktotal ? (kc/ktotal*100).toFixed(0) : 0}%`;
-  document.getElementById('fatPct').textContent = `${kf} kcal \u00b7 ${ktotal ? (kf/ktotal*100).toFixed(0) : 0}%`;
-  document.getElementById('macroSum').textContent = Math.round(ktotal);
+  document.getElementById('inputProteinPct').value = s.proteinPct;
+  document.getElementById('inputFatPct').value = s.fatPct;
+  document.getElementById('inputCarbsPct').value = s.carbsPct;
+  document.getElementById('proteinPctValue').textContent = s.proteinPct + '%';
+  document.getElementById('fatPctValue').textContent = s.fatPct + '%';
+  document.getElementById('carbsPctValue').textContent = s.carbsPct + '%';
+
+  document.getElementById('proteinGramsInfo').textContent = `${s.protein_g} g \u00b7 ${s.protein_g * CALORIES_PER_GRAM.protein} kcal`;
+  document.getElementById('fatGramsInfo').textContent = `${s.fat_g} g \u00b7 ${s.fat_g * CALORIES_PER_GRAM.fat} kcal`;
+  document.getElementById('carbsGramsInfo').textContent = `${s.carbs_g} g \u00b7 ${s.carbs_g * CALORIES_PER_GRAM.carbs} kcal`;
+
+  document.getElementById('macroPctSum').textContent = s.proteinPct + s.fatPct + s.carbsPct;
 }
 
 function renderNutrientProgress() {
@@ -811,9 +1008,19 @@ function renderNutrientProgress() {
 // ---- Food group sections ----
 function renderFoodGroups() {
   const container = document.getElementById('foodGroups');
-  container.innerHTML = BUCKET_KEYS.map(bucket => buildFoodGroupHtml(bucket)).join('');
+  const visibleBuckets = BUCKET_KEYS.filter(b => !state.hiddenBuckets.includes(b));
+  const hiddenBuckets = BUCKET_KEYS.filter(b => state.hiddenBuckets.includes(b));
 
-  BUCKET_KEYS.forEach(bucket => {
+  let html = visibleBuckets.map(bucket => buildFoodGroupHtml(bucket)).join('');
+  if (hiddenBuckets.length > 0) {
+    html += `<div class="hidden-categories-row">
+      <span style="color:var(--ink-soft);font-size:12px;">Hidden:</span>
+      ${hiddenBuckets.map(b => `<button class="chip" onclick="showBucket('${b}')">+ ${BUCKET_LABELS[b]}</button>`).join('')}
+    </div>`;
+  }
+  container.innerHTML = html;
+
+  visibleBuckets.forEach(bucket => {
     const searchInput = document.getElementById('search-' + bucket);
     searchInput.addEventListener('input', () => onFoodSearchInput(bucket));
     document.addEventListener('click', (e) => {
@@ -826,6 +1033,17 @@ function renderFoodGroups() {
   });
 }
 
+function hideBucket(bucket) {
+  if (!state.hiddenBuckets.includes(bucket)) state.hiddenBuckets.push(bucket);
+  saveProfileToStorage();
+  renderFoodGroups();
+}
+function showBucket(bucket) {
+  state.hiddenBuckets = state.hiddenBuckets.filter(b => b !== bucket);
+  saveProfileToStorage();
+  renderFoodGroups();
+}
+
 function buildFoodGroupHtml(bucket) {
   const entries = state.entries[bucket];
   let rows = '';
@@ -836,7 +1054,7 @@ function buildFoodGroupHtml(bucket) {
   }
   return `
     <div class="food-group">
-      <h3>${BUCKET_LABELS[bucket]}</h3>
+      <h3><span>${BUCKET_LABELS[bucket]}</span><button class="remove-category-btn" onclick="hideBucket('${bucket}')" title="Remove this category from view">&times;</button></h3>
       <div class="food-search-wrap">
         <input type="text" id="search-${bucket}" placeholder="Search ${BUCKET_LABELS[bucket].toLowerCase()}...">
         <div class="search-results" id="searchResults-${bucket}"></div>
@@ -956,7 +1174,7 @@ function exportCsv() {
 }
 function exportText() {
   const data = buildExportData();
-  let out = `Vegan Nutrition Tracker - ${data.label || data.exportedOn}\n`;
+  let out = `Nutrition Tracker - ${data.label || data.exportedOn}\n`;
   out += '='.repeat(40) + '\n\n';
   BUCKET_KEYS.forEach(bucket => {
     out += BUCKET_LABELS[bucket] + ':\n';
@@ -1006,39 +1224,18 @@ function wireProfileControls() {
   });
   document.getElementById('btnRecalc').addEventListener('click', recalculateTargetsFromProfile);
 
-  // ---- Calories slider rescales protein/fat/carbs proportionally ----
+  // Calories slider: the macro PERCENTAGES stay exactly as they are - only
+  // the derived gram amounts change, since they're calories * pct / 100.
   document.getElementById('sliderCalories').addEventListener('input', e => {
-    const newCalories = parseInt(e.target.value);
-    const currentMacroCalories = macroCaloriesFromTargets(state.targets);
-    const scale = currentMacroCalories > 0 ? newCalories / currentMacroCalories : 1;
-
-    const proteinSlider = document.getElementById('sliderProtein');
-    const fatSlider = document.getElementById('sliderFat');
-    const carbsSlider = document.getElementById('sliderCarbs');
-
-    state.targets.protein_g = clamp(Math.round(state.targets.protein_g * scale), +proteinSlider.min, +proteinSlider.max);
-    state.targets.fat_g = clamp(Math.round(state.targets.fat_g * scale), +fatSlider.min, +fatSlider.max);
-    state.targets.carbs_g = clamp(Math.round(state.targets.carbs_g * scale), +carbsSlider.min, +carbsSlider.max);
-    state.targets.calories = newCalories;
-
+    state.targets.calories = parseInt(e.target.value);
+    recomputeMacroGramsFromPercents();
     renderSliders();
     saveProfileToStorage();
     renderNutrientProgress();
   });
-
-  // ---- Any macro slider recalculates total calories to match ----
-  function wireMacroSlider(sliderId, targetKey) {
-    document.getElementById(sliderId).addEventListener('input', e => {
-      state.targets[targetKey] = parseInt(e.target.value);
-      state.targets.calories = Math.round(macroCaloriesFromTargets(state.targets));
-      renderSliders();
-      saveProfileToStorage();
-      renderNutrientProgress();
-    });
-  }
-  wireMacroSlider('sliderProtein', 'protein_g');
-  wireMacroSlider('sliderFat', 'fat_g');
-  wireMacroSlider('sliderCarbs', 'carbs_g');
+  // Protein/Fat/Carbs are now percentage steppers (adjustMacroPercent /
+  // setMacroPercent, called directly from their buttons/input in the HTML)
+  // rather than sliders, so there's no separate wiring needed here.
 }
 
 function wireLabelInput() {
