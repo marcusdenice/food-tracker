@@ -438,6 +438,20 @@
     </div>
   </div>
 
+  <!-- ============================================================
+       UPLOAD / RESTORE PANEL
+       ============================================================ -->
+  <div class="panel">
+    <h2>Load a Previous Download</h2>
+    <p style="color:var(--ink-soft); font-size:0.88rem; margin-top:-6px;">
+      Upload a JSON or CSV file you downloaded earlier to restore that food list. JSON restores everything
+      exactly (including supplements); CSV works too, but supplement amounts have to be reconstructed from the
+      summary text in the file, so it's a slightly less exact round-trip. This <strong>replaces</strong> what's
+      currently logged - it doesn't merge with it.
+    </p>
+    <input type="file" id="inputUploadFile" accept=".json,.csv" style="margin-top:6px;">
+  </div>
+
 </div>
 
 <footer class="note">
@@ -1719,6 +1733,196 @@ function exportText() {
 
 
 /* ================================================================
+   SECTION 7b: IMPORT / RESTORE FROM A PREVIOUS DOWNLOAD
+   ================================================================ */
+
+// A small hand-written CSV parser (not just String.split(',')) - needed
+// because our own export quotes fields that contain commas (food names
+// like "APPLEBEE'S, 9 oz house sirloin steak") and the Notes field can
+// contain commas, quotes, and even newlines. This reads character by
+// character and only treats commas/newlines as separators when we're NOT
+// inside a quoted field, so all of that round-trips correctly.
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; } // escaped quote
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ',') {
+      row.push(field); field = '';
+    } else if (c === '\r') {
+      // ignore - handled by the following \n
+    } else if (c === '\n') {
+      row.push(field); rows.push(row); row = []; field = '';
+    } else {
+      field += c;
+    }
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  return rows.filter(r => !(r.length === 1 && r[0].trim() === ''));
+}
+
+// Both parsers below return the same shape:
+// { newEntries: {bucketKey: [{foodId,grams}]}, newSupplements: [{name,servings,nutrients}], notes, unmatched: [string] }
+
+function parseImportFromJson(text) {
+  const data = JSON.parse(text);
+  const newEntries = {};
+  BUCKET_KEYS.forEach(b => newEntries[b] = []);
+  const unmatched = [];
+
+  BUCKET_KEYS.forEach(bucket => {
+    ((data.foods && data.foods[bucket]) || []).forEach(item => {
+      const food = FOODS.find(f => f.name.toLowerCase() === String(item.name).toLowerCase());
+      if (food) newEntries[bucket].push({ foodId: food.id, grams: item.grams });
+      else unmatched.push(`${item.name} (not found in database)`);
+    });
+  });
+
+  const newSupplements = (data.supplements || []).map(s => ({
+    name: s.name, servings: s.servings, nutrients: s.nutrients || {}
+  }));
+
+  return { newEntries, newSupplements, notes: data.notes || '', unmatched };
+}
+
+function parseImportFromCsv(text) {
+  const rows = parseCsv(text);
+  const newEntries = {};
+  BUCKET_KEYS.forEach(b => newEntries[b] = []);
+  const newSupplements = [];
+  const unmatched = [];
+
+  const labelToBucket = {};
+  BUCKET_KEYS.forEach(b => { labelToBucket[BUCKET_LABELS[b]] = b; });
+  const labelToNutrientKey = {};
+  SUPPLEMENT_NUTRIENT_OPTIONS.forEach(([key, label]) => { labelToNutrientKey[label] = key; });
+
+  let inNotesSection = false;
+  let notes = '';
+
+  rows.forEach((fields, idx) => {
+    if (idx === 0 && fields[0] === 'Food Group') return; // header row
+    if (fields.length === 1 && fields[0] === 'Notes') { inNotesSection = true; return; }
+    if (inNotesSection) { notes = fields[0] || ''; return; }
+    if (fields.length < 3 || !fields[0]) return; // skip blank/malformed rows
+
+    const [groupLabel, name, thirdField, fourthField] = fields;
+
+    if (groupLabel === 'Supplements') {
+      // thirdField looks like "2 serving(s)"; fourthField looks like
+      // "Vitamin B12 25mcg" or "Protein 24g; Calories 110kcal" - both are
+      // TOTALS (amount * servings), so we divide back out by servings to
+      // recover the per-serving amount the app actually needs.
+      const servingsMatch = /^([\d.]+)/.exec(thirdField || '');
+      const servings = servingsMatch ? parseFloat(servingsMatch[1]) : 1;
+      const nutrients = {};
+      (fourthField || '').split(';').forEach(piece => {
+        const m = /^\s*(.+?)\s+([\d.]+)(mcg|mg|kcal|g)\s*$/.exec(piece);
+        if (!m) return;
+        const label = m[1].trim();
+        const totalAmount = parseFloat(m[2]);
+        const key = labelToNutrientKey[label];
+        if (!key || servings <= 0) return;
+        nutrients[key] = totalAmount / servings;
+      });
+      if (Object.keys(nutrients).length > 0) {
+        newSupplements.push({ name, servings, nutrients });
+      } else {
+        unmatched.push(`Supplement "${name}" (couldn't parse its nutrient amounts)`);
+      }
+      return;
+    }
+
+    const bucket = labelToBucket[groupLabel];
+    const grams = parseFloat(thirdField);
+    if (!bucket || isNaN(grams)) { unmatched.push(`${name} (unrecognized row)`); return; }
+
+    const food = FOODS.find(f => f.name.toLowerCase() === name.toLowerCase());
+    if (!food) { unmatched.push(`${name} (not found in database)`); return; }
+
+    newEntries[bucket].push({ foodId: food.id, grams });
+  });
+
+  return { newEntries, newSupplements, notes, unmatched };
+}
+
+// Replaces the current food/supplement log with an imported one. Matches
+// supplements to your existing library by name where possible, and
+// creates a new library entry for any that aren't already saved.
+function applyImportResult(result) {
+  BUCKET_KEYS.forEach(b => { state.entries[b] = result.newEntries[b] || []; });
+
+  state.entries.supplements = [];
+  result.newSupplements.forEach(supp => {
+    let libEntry = state.supplementLibrary.find(s => s.name.toLowerCase() === supp.name.toLowerCase());
+    if (!libEntry) {
+      libEntry = { id: generateSupplementId(), name: supp.name, nutrients: supp.nutrients };
+      state.supplementLibrary.push(libEntry);
+    }
+    state.entries.supplements.push({ supplementId: libEntry.id, servings: supp.servings });
+  });
+
+  state.entries.notes = result.notes;
+
+  saveProfileToStorage();
+  saveEntriesToStorage();
+  renderFoodGroups();
+  renderSupplementsSection();
+  renderNutrientProgress();
+  document.getElementById('inputNotes').value = state.entries.notes;
+
+  const totalFoods = BUCKET_KEYS.reduce((sum, b) => sum + state.entries[b].length, 0);
+  let message = `Imported ${totalFoods} food item(s) and ${result.newSupplements.length} supplement(s).`;
+  if (result.unmatched.length > 0) {
+    message += `\n\n${result.unmatched.length} item(s) couldn't be matched and were skipped:\n` +
+      result.unmatched.slice(0, 15).join('\n') +
+      (result.unmatched.length > 15 ? `\n...and ${result.unmatched.length - 15} more` : '');
+  }
+  alert(message);
+}
+
+function handleUploadedFile(file) {
+  const confirmed = confirm("This will replace everything currently logged with the uploaded file's contents. Continue?");
+  if (!confirmed) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const text = reader.result;
+      const result = file.name.toLowerCase().endsWith('.json')
+        ? parseImportFromJson(text)
+        : parseImportFromCsv(text);
+      applyImportResult(result);
+    } catch (e) {
+      console.error('Import failed', e);
+      alert("Couldn't read that file - make sure it's a JSON or CSV file downloaded from this app.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+function wireUploadInput() {
+  document.getElementById('inputUploadFile').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    handleUploadedFile(file);
+    e.target.value = ''; // allow re-selecting the same file later
+  });
+}
+
+
+/* ================================================================
    SECTION 8: WIRE UP CONTROLS + INIT
    ================================================================ */
 function wireProfileControls() {
@@ -1821,6 +2025,7 @@ function init() {
   wireNotesInput();
   wireResetButton();
   wireExportButtons();
+  wireUploadInput();
   renderSupplementsSection();
   renderFoodGroups();
   renderNutrientProgress();
