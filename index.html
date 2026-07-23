@@ -556,11 +556,11 @@ const AMINO_PATTERN_MG_PER_G_PROTEIN = {
 // target rather than a strict requirement.
 const OMEGA_AI_TARGETS = {
   omega3_g: { male: 1.6, female: 1.1 },
-  ala_g:    { male: 1.6, female: 1.1 },
+  ala_mg:   { male: 1600, female: 1100 },
   omega6_g: { male: 17,  female: 12 },
   la_g:     { male: 17,  female: 12 },
 };
-const EPA_DHA_TARGET_G = 0.25;
+const EPA_DHA_TARGET_MG = 250;
 
 // Traditional/commonly-used benchmarks for fats where no per-person RDA
 // exists: <10% of calories from saturated fat and added sugar (both
@@ -594,9 +594,9 @@ const LIPID_ROWS = [
   { key: 'monounsaturatedFat_g', label: 'Monounsaturated', unit: 'g', kind: 'info' },
   { key: 'polyunsaturatedFat_g', label: 'Polyunsaturated', unit: 'g', kind: 'info' },
   { key: 'omega3_g', label: 'Omega-3', unit: 'g', kind: 'aiTarget' },
-  { key: 'ala_g', label: 'ALA', unit: 'g', kind: 'aiTarget' },
-  { key: 'dha_g', label: 'DHA', unit: 'g', kind: 'fixedTarget', amount: EPA_DHA_TARGET_G },
-  { key: 'epa_g', label: 'EPA', unit: 'g', kind: 'fixedTarget', amount: EPA_DHA_TARGET_G },
+  { key: 'ala_mg', label: 'ALA', unit: 'mg', kind: 'aiTarget' },
+  { key: 'dha_mg', label: 'DHA', unit: 'mg', kind: 'fixedTarget', amount: EPA_DHA_TARGET_MG },
+  { key: 'epa_mg', label: 'EPA', unit: 'mg', kind: 'fixedTarget', amount: EPA_DHA_TARGET_MG },
   { key: 'omega6_g', label: 'Omega-6', unit: 'g', kind: 'aiTarget' },
   { key: 'aa_g', label: 'AA', unit: 'g', kind: 'info' },
   { key: 'la_g', label: 'LA', unit: 'g', kind: 'aiTarget' },
@@ -672,9 +672,9 @@ const SUPPLEMENT_NUTRIENT_OPTIONS = [
   ['transFat_g', 'Trans Fat', 'g'],
   ['cholesterol_mg', 'Cholesterol', 'mg'],
   ['omega3_g', 'Omega-3 (total)', 'g'],
-  ['ala_g', 'ALA', 'g'],
-  ['epa_g', 'EPA', 'g'],
-  ['dha_g', 'DHA', 'g'],
+  ['ala_mg', 'ALA', 'mg'],
+  ['epa_mg', 'EPA', 'mg'],
+  ['dha_mg', 'DHA', 'mg'],
   ['omega6_g', 'Omega-6 (total)', 'g'],
   ['la_g', 'LA', 'g'],
   ['aa_g', 'AA', 'g'],
@@ -1066,9 +1066,9 @@ const NUTRIENT_FUNCTIONS = {
   monounsaturatedFat_g: 'A "heart-healthy" fat that can help lower LDL cholesterol when it replaces saturated fat.',
   polyunsaturatedFat_g: 'Includes essential omega-3 and omega-6 fats your body can\u2019t make on its own.',
   omega3_g: 'Supports heart, brain, and eye health, and helps regulate inflammation.',
-  ala_g: 'A plant-based omega-3 fat; the body converts a small amount of it into EPA and DHA.',
-  dha_g: 'An omega-3 fat concentrated in the brain and eyes, supporting cognitive and visual function.',
-  epa_g: 'An omega-3 fat that helps regulate inflammation and supports heart health.',
+  ala_mg: 'A plant-based omega-3 fat; the body converts a small amount of it into EPA and DHA.',
+  dha_mg: 'An omega-3 fat concentrated in the brain and eyes, supporting cognitive and visual function.',
+  epa_mg: 'An omega-3 fat that helps regulate inflammation and supports heart health.',
   omega6_g: 'An essential fat family used for cell membranes and signaling - most diets get plenty already.',
   aa_g: 'An omega-6 fat used to build cell membranes and inflammatory signaling molecules.',
   la_g: 'The most common omega-6 fat in most diets; essential in small amounts for cell membrane structure.',
@@ -1126,9 +1126,9 @@ const FOOD_SOURCE_SUGGESTIONS = {
   monounsaturatedFat_g: ['Olive oil', 'Avocado', 'Almonds & cashews', 'Peanut butter'],
   polyunsaturatedFat_g: ['Walnuts', 'Flaxseed & chia seeds', 'Sunflower & corn oil', 'Fatty fish (if eaten)'],
   omega3_g: ['Flaxseed & chia seeds', 'Walnuts', 'Algae-based supplements', 'Fatty fish (if eaten)'],
-  ala_g: ['Flaxseed & flaxseed oil', 'Chia seeds', 'Walnuts', 'Canola & soybean oil'],
-  dha_g: ['Algae-based supplements', 'Fatty fish (if eaten)', 'Fortified foods (some plant milks/eggs)'],
-  epa_g: ['Algae-based supplements', 'Fatty fish (if eaten)'],
+  ala_mg: ['Flaxseed & flaxseed oil', 'Chia seeds', 'Walnuts', 'Canola & soybean oil'],
+  dha_mg: ['Algae-based supplements', 'Fatty fish (if eaten)', 'Fortified foods (some plant milks/eggs)'],
+  epa_mg: ['Algae-based supplements', 'Fatty fish (if eaten)'],
   omega6_g: ['Vegetable oils (corn, soybean, sunflower)', 'Nuts & seeds', 'Poultry (if eaten)'],
   aa_g: ['Meat, poultry & eggs (if eaten)', 'Small amounts made naturally by the body from LA'],
   la_g: ['Sunflower, safflower & corn oil', 'Walnuts', 'Sunflower seeds', 'Soybean oil'],
