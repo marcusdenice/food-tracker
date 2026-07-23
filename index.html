@@ -99,6 +99,17 @@
   .cal-total-line .big { font-size: 20px; font-weight: 700; color: var(--moss-deep); }
   .cal-total-line .hint { color: var(--ink-soft); font-family: var(--font-body); font-size: 12px; }
 
+  .day-multiplier-row {
+    margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .day-multiplier-row .gram-control input[type="number"] { width: 50px; text-align: center; }
+
+  textarea#inputNotes {
+    width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 2px;
+    font-family: var(--font-body); font-size: 0.9rem; background: #fff; resize: vertical;
+  }
+
   /* ---------- main grid: nutrients | foods ---------- */
   .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; align-items: start; }
   @media (max-width: 980px) { .main-grid { grid-template-columns: 1fr; } }
@@ -204,6 +215,8 @@
   .fill.mid { background: var(--amber-warn); }
   .fill.ok { background: var(--sage-ok); }
   .fill.over-max { background: var(--rust); }
+  .nrow.info-row { opacity: 0.8; }
+  .nrow.info-row .amt { font-style: italic; }
 
   .legend { display: flex; gap: 16px; font-size: 11px; color: var(--ink-soft); margin-top: 14px; flex-wrap: wrap; }
   .legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -340,6 +353,23 @@
       <span>Protein + Carbs + Fat = <span class="big" id="macroPctSum"></span>%</span>
       <span class="hint">Adjusting one percentage rescales the other two automatically, so they always add up to 100%.</span>
     </div>
+
+    <!-- ============================================================
+         DAY MULTIPLIER
+         Multiplies every target in the panel below by this many days,
+         so the bars represent (say) a week's worth of nutrition instead
+         of one day - handy for building a shopping list. It does NOT
+         change the calorie/macro numbers above, which stay per-day.
+         ============================================================ -->
+    <div class="day-multiplier-row">
+      <span class="name" style="font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Planning for</span>
+      <div class="gram-control">
+        <button onclick="adjustDayMultiplier(-1)">-</button>
+        <input type="number" id="inputDayMultiplier" min="1" max="10" step="1" onchange="setDayMultiplier(this.value)">
+        <button onclick="adjustDayMultiplier(1)">+</button>
+      </div>
+      <span class="hint">day(s) - multiplies every target below (1 = a normal daily view; higher = a shopping-list total for that many days).</span>
+    </div>
   </div>
 
   <!-- ============================================================
@@ -350,32 +380,49 @@
     <div class="panel">
       <h2>Targets vs. What You've Logged</h2>
       <div class="target-section">
-        <h4>Macros</h4>
-        <div id="macroBars"></div>
+        <div id="caloriesBar"></div>
 
-        <h4>Fiber &amp; Calorie-Linked B-Vitamins</h4>
-        <div id="calLinkedBars"></div>
+        <h4>Carbohydrates</h4>
+        <div id="carbBars"></div>
 
-        <h4>Essential Amino Acids <span style="text-transform:none;color:var(--ink-soft);">(scaled to your protein target)</span></h4>
-        <div id="aminoBars"></div>
+        <h4>Lipids</h4>
+        <div id="lipidBars"></div>
 
-        <h4>Vitamins &amp; Minerals <span style="text-transform:none;color:var(--ink-soft);">(set by sex/age)</span></h4>
-        <div id="vitBars"></div>
+        <h4>Protein</h4>
+        <div id="proteinBars"></div>
+
+        <h4>Vitamins</h4>
+        <div id="vitaminBars"></div>
+
+        <h4>Minerals</h4>
+        <div id="mineralBars"></div>
       </div>
       <div class="legend">
         <span><i style="background:var(--red-low);"></i> under 70% of target</span>
         <span><i style="background:var(--amber-warn);"></i> 70&ndash;100%</span>
         <span><i style="background:var(--sage-ok);"></i> target met</span>
-        <span><i style="background:var(--rust);"></i> over safe limit (sodium / selenium)</span>
+        <span><i style="background:var(--rust);"></i> over safe limit (sodium, saturated fat, etc.)</span>
+        <span><i style="background:var(--line);"></i> no established target - logged amount only</span>
       </div>
     </div>
 
     <div class="panel">
-      <h2>Your Foods (grams/day)</h2>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <h2 style="border:none;margin-bottom:0;padding-bottom:0;">Your Foods (grams/day)</h2>
+        <button class="chip" id="btnResetFoods" style="margin-top:-14px;">Reset all foods</button>
+      </div>
       <div class="food-group" id="supplementsGroup"></div>
       <div id="foodGroups"></div>
     </div>
 
+  </div>
+
+  <!-- ============================================================
+       NOTES
+       ============================================================ -->
+  <div class="panel">
+    <h2>Notes</h2>
+    <textarea id="inputNotes" rows="4" placeholder="Anything you want saved at the bottom of your downloaded file - meal prep reminders, how you felt today, etc."></textarea>
   </div>
 
   <!-- ============================================================
@@ -396,9 +443,9 @@
 <footer class="note">
   Nutrient values come from the USDA SR Legacy database. Vitamin/mineral targets use general adult RDAs - this is a
   planning tool, not a substitute for a dietitian, especially with kidney, thyroid, or other conditions where
-  potassium/phosphorus intake needs individual attention. Iodine and omega-3 fatty acids aren't tracked here; B12
-  and vitamin D are tracked, but vegan whole foods rarely provide them naturally, so keep an eye on those two bars
-  and talk to a doctor about supplementing if they stay low.
+  potassium/phosphorus intake needs individual attention. Iodine isn't tracked here. B12 and vitamin D are tracked,
+  but vegan whole foods rarely provide them naturally, so keep an eye on those two bars and talk to a doctor about
+  supplementing if they stay low.
 </footer>
 
 <!-- Shared tooltip element - one div, repositioned and refilled on hover
@@ -416,7 +463,7 @@
 const ACTIVITY_MULTIPLIERS = {
   sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, veryActive: 1.9
 };
-const DEFAULT_MACRO_SPLIT = { protein: 0.25, fat: 0.30, carbs: 0.45 };
+const DEFAULT_MACRO_SPLIT = { protein: 0.20, fat: 0.30, carbs: 0.50 };
 const CALORIES_PER_GRAM = { protein: 4, fat: 9, carbs: 4 };
 
 // ---- Food groups (right-hand column) ----
@@ -476,35 +523,10 @@ function currentRdaKey() {
   const age = state.profile.age;
   return gender + (age >= 51 ? '_51plus' : '_lt51');
 }
-// Display list for the fixed vitamins/minerals section: [key, label, unit, opts]
-const NUTRIENT_META = [
-  ['calcium_mg', 'Calcium', 'mg', {}],
-  ['iron_mg', 'Iron', 'mg', {}],
-  ['magnesium_mg', 'Magnesium', 'mg', {}],
-  ['phosphorus_mg', 'Phosphorus', 'mg', {}],
-  ['potassium_mg', 'Potassium', 'mg', {}],
-  ['zinc_mg', 'Zinc', 'mg', {}],
-  ['copper_mg', 'Copper', 'mg', {}],
-  ['manganese_mg', 'Manganese', 'mg', {}],
-  ['selenium_ug', 'Selenium', 'mcg', { ceiling: 400 }],
-  ['vitaminA_ug', 'Vitamin A', 'mcg', {}],
-  ['vitaminC_mg', 'Vitamin C', 'mg', {}],
-  ['vitaminD_ug', 'Vitamin D', 'mcg', {}],
-  ['vitaminE_mg', 'Vitamin E', 'mg', {}],
-  ['vitaminK_ug', 'Vitamin K', 'mcg', {}],
-  ['folate_ug', 'Folate', 'mcg', {}],
-  ['vitaminB6_mg', 'Vitamin B6', 'mg', {}],
-  ['vitaminB12_ug', 'Vitamin B12', 'mcg', {}],
-  ['biotin_ug', 'Biotin', 'mcg', {}],
-  ['pantothenicAcid_mg', 'Pantothenic Acid (B5)', 'mg', {}],
-  ['choline_mg', 'Choline', 'mg', {}],
-  ['sodium_mg', 'Sodium (daily limit)', 'mg', { isMax: true }],
-];
 
-// ---- Fiber + calorie-linked B-vitamins ----
-// Unlike most vitamins, these four genuinely scale with how much you eat,
-// not just your sex/age - so their targets are computed from the calorie
-// slider instead of coming out of RDA_TABLE.
+// Fiber and three B-vitamins genuinely scale with how much you eat (not
+// just sex/age), so their targets come from the calorie target via these
+// standard per-1,000-kcal formulas instead of the fixed RDA table above.
 function calorieLinkedTargets(kcalTarget) {
   return {
     fiber_g: 14 * kcalTarget / 1000,
@@ -513,29 +535,115 @@ function calorieLinkedTargets(kcalTarget) {
     niacin_mg: Math.max(14, 6.6 * kcalTarget / 1000),
   };
 }
-const CAL_LINKED_META = [
-  ['fiber_g', 'Fiber', 'g'],
-  ['thiamin_mg', 'Thiamin (B1)', 'mg'],
-  ['riboflavin_mg', 'Riboflavin (B2)', 'mg'],
-  ['niacin_mg', 'Niacin (B3)', 'mg'],
-];
 
-// ---- Essential amino acids ----
-// Targets scale with your PROTEIN target (grams), using the FAO/WHO/UNU
-// (2007) amino acid scoring pattern: mg of amino acid needed per gram of
-// protein eaten. Two pairs are conventionally scored as a combined total.
+// FAO/WHO/UNU (2007) amino acid scoring pattern: mg of amino acid needed
+// per gram of protein eaten, scaled by your protein target. The official
+// pattern gives methionine+cystine and phenylalanine+tyrosine as COMBINED
+// requirements (they're metabolically interchangeable to a degree) - since
+// each is now shown as its own row, the same combined number is applied to
+// each individually, which is a simplification worth knowing about rather
+// than two independently-derived numbers.
 const AMINO_PATTERN_MG_PER_G_PROTEIN = {
-  histidine_g: 15, isoleucine_g: 30, leucine_g: 59, lysine_g: 45,
-  threonine_g: 23, tryptophan_g: 6, valine_g: 39,
+  cystine_g: 22, histidine_g: 15, isoleucine_g: 30, leucine_g: 59, lysine_g: 45,
+  methionine_g: 22, phenylalanine_g: 38, threonine_g: 23, tryptophan_g: 6,
+  tyrosine_g: 38, valine_g: 39,
 };
-const AMINO_COMBINED_PATTERN = [
-  { keys: ['methionine_g', 'cystine_g'], mgPerGProtein: 22, label: 'Methionine + Cystine' },
-  { keys: ['phenylalanine_g', 'tyrosine_g'], mgPerGProtein: 38, label: 'Phenylalanine + Tyrosine' },
+
+// Adequate Intake (AI) values for essential fatty acids (IOM/NAM Dietary
+// Reference Intakes), by sex. EPA/DHA don't have an official AI on their
+// own - 250mg/day combined is a commonly cited general-health benchmark
+// from bodies like WHO/EFSA, applied here to each individually as a loose
+// target rather than a strict requirement.
+const OMEGA_AI_TARGETS = {
+  omega3_g: { male: 1.6, female: 1.1 },
+  ala_g:    { male: 1.6, female: 1.1 },
+  omega6_g: { male: 17,  female: 12 },
+  la_g:     { male: 17,  female: 12 },
+};
+const EPA_DHA_TARGET_G = 0.25;
+
+// Traditional/commonly-used benchmarks for fats where no per-person RDA
+// exists: <10% of calories from saturated fat and added sugar (both
+// Dietary Guidelines for Americans figures), <1% from trans fat (WHO
+// 2018 guidance), and 300mg cholesterol (a long-standing benchmark that
+// current US guidelines no longer set a hard number for, but which most
+// nutrition tools - and many clinicians - still use as a reference point).
+const PERCENT_CALORIE_LIMITS = {
+  sugar_g:         { pct: 0.10, calsPerGram: 4 },
+  saturatedFat_g:  { pct: 0.10, calsPerGram: 9 },
+  transFat_g:      { pct: 0.01, calsPerGram: 9 },
+};
+const FIXED_LIMITS_MG = { cholesterol_mg: 300 };
+
+// ---- The five target categories, in the order they're displayed ----
+// kind values: 'macro' (protein/fat/carbs target from the slider),
+// 'netCarbs' (derived carbs - fiber), 'calorieLinked', 'proteinScaled',
+// 'fixedRda', 'pctCalories' (isMax), 'aiTarget', 'fixedTarget', 'info'
+// (logged amount only - no defensible target to compare against).
+const CARB_ROWS = [
+  { key: 'carbs_g', label: 'Carbs', unit: 'g', kind: 'macro' },
+  { key: 'netCarbs_g', label: 'Net Carbs', unit: 'g', kind: 'netCarbs' },
+  { key: 'fiber_g', label: 'Fiber', unit: 'g', kind: 'calorieLinked' },
+  { key: 'insolubleFiber_g', label: 'Insoluble Fiber', unit: 'g', kind: 'info', note: 'not measured in this database' },
+  { key: 'solubleFiber_g', label: 'Soluble Fiber', unit: 'g', kind: 'info', note: 'not measured in this database' },
+  { key: 'starch_g', label: 'Starch', unit: 'g', kind: 'info' },
+  { key: 'sugar_g', label: 'Sugars', unit: 'g', kind: 'pctCalories', isMax: true },
 ];
-const AMINO_LABELS = {
-  histidine_g: 'Histidine', isoleucine_g: 'Isoleucine', leucine_g: 'Leucine',
-  lysine_g: 'Lysine', threonine_g: 'Threonine', tryptophan_g: 'Tryptophan', valine_g: 'Valine',
-};
+const LIPID_ROWS = [
+  { key: 'fat_g', label: 'Fat', unit: 'g', kind: 'macro' },
+  { key: 'monounsaturatedFat_g', label: 'Monounsaturated', unit: 'g', kind: 'info' },
+  { key: 'polyunsaturatedFat_g', label: 'Polyunsaturated', unit: 'g', kind: 'info' },
+  { key: 'omega3_g', label: 'Omega-3', unit: 'g', kind: 'aiTarget' },
+  { key: 'ala_g', label: 'ALA', unit: 'g', kind: 'aiTarget' },
+  { key: 'dha_g', label: 'DHA', unit: 'g', kind: 'fixedTarget', amount: EPA_DHA_TARGET_G },
+  { key: 'epa_g', label: 'EPA', unit: 'g', kind: 'fixedTarget', amount: EPA_DHA_TARGET_G },
+  { key: 'omega6_g', label: 'Omega-6', unit: 'g', kind: 'aiTarget' },
+  { key: 'aa_g', label: 'AA', unit: 'g', kind: 'info' },
+  { key: 'la_g', label: 'LA', unit: 'g', kind: 'aiTarget' },
+  { key: 'saturatedFat_g', label: 'Saturated', unit: 'g', kind: 'pctCalories', isMax: true },
+  { key: 'transFat_g', label: 'Trans-Fats', unit: 'g', kind: 'pctCalories', isMax: true },
+  { key: 'cholesterol_mg', label: 'Cholesterol', unit: 'mg', kind: 'fixedTarget', isMax: true },
+];
+const PROTEIN_ROWS = [
+  { key: 'protein_g', label: 'Protein', unit: 'g', kind: 'macro' },
+  { key: 'cystine_g', label: 'Cystine', unit: 'g', kind: 'proteinScaled' },
+  { key: 'histidine_g', label: 'Histidine', unit: 'g', kind: 'proteinScaled' },
+  { key: 'isoleucine_g', label: 'Isoleucine', unit: 'g', kind: 'proteinScaled' },
+  { key: 'leucine_g', label: 'Leucine', unit: 'g', kind: 'proteinScaled' },
+  { key: 'lysine_g', label: 'Lysine', unit: 'g', kind: 'proteinScaled' },
+  { key: 'methionine_g', label: 'Methionine', unit: 'g', kind: 'proteinScaled' },
+  { key: 'phenylalanine_g', label: 'Phenylalanine', unit: 'g', kind: 'proteinScaled' },
+  { key: 'threonine_g', label: 'Threonine', unit: 'g', kind: 'proteinScaled' },
+  { key: 'tryptophan_g', label: 'Tryptophan', unit: 'g', kind: 'proteinScaled' },
+  { key: 'tyrosine_g', label: 'Tyrosine', unit: 'g', kind: 'proteinScaled' },
+  { key: 'valine_g', label: 'Valine', unit: 'g', kind: 'proteinScaled' },
+];
+const VITAMIN_ROWS = [
+  { key: 'thiamin_mg', label: 'B1 (Thiamine)', unit: 'mg', kind: 'calorieLinked' },
+  { key: 'riboflavin_mg', label: 'B2 (Riboflavin)', unit: 'mg', kind: 'calorieLinked' },
+  { key: 'niacin_mg', label: 'B3 (Niacin)', unit: 'mg', kind: 'calorieLinked' },
+  { key: 'pantothenicAcid_mg', label: 'B5 (Pantothenic Acid)', unit: 'mg', kind: 'fixedRda' },
+  { key: 'vitaminB6_mg', label: 'B6 (Pyridoxine)', unit: 'mg', kind: 'fixedRda' },
+  { key: 'vitaminB12_ug', label: 'B12 (Cobalamin)', unit: 'mcg', kind: 'fixedRda' },
+  { key: 'folate_ug', label: 'Folate', unit: 'mcg', kind: 'fixedRda' },
+  { key: 'vitaminA_ug', label: 'Vitamin A', unit: 'mcg', kind: 'fixedRda' },
+  { key: 'vitaminC_mg', label: 'Vitamin C', unit: 'mg', kind: 'fixedRda' },
+  { key: 'vitaminD_ug', label: 'Vitamin D', unit: 'mcg', kind: 'fixedRda' },
+  { key: 'vitaminE_mg', label: 'Vitamin E', unit: 'mg', kind: 'fixedRda' },
+  { key: 'vitaminK_ug', label: 'Vitamin K', unit: 'mcg', kind: 'fixedRda' },
+];
+const MINERAL_ROWS = [
+  { key: 'calcium_mg', label: 'Calcium', unit: 'mg', kind: 'fixedRda' },
+  { key: 'copper_mg', label: 'Copper', unit: 'mg', kind: 'fixedRda' },
+  { key: 'iron_mg', label: 'Iron', unit: 'mg', kind: 'fixedRda' },
+  { key: 'magnesium_mg', label: 'Magnesium', unit: 'mg', kind: 'fixedRda' },
+  { key: 'manganese_mg', label: 'Manganese', unit: 'mg', kind: 'fixedRda' },
+  { key: 'phosphorus_mg', label: 'Phosphorus', unit: 'mg', kind: 'fixedRda' },
+  { key: 'potassium_mg', label: 'Potassium', unit: 'mg', kind: 'fixedRda' },
+  { key: 'selenium_ug', label: 'Selenium', unit: 'mcg', kind: 'fixedRda', ceiling: 400 },
+  { key: 'sodium_mg', label: 'Sodium', unit: 'mg', kind: 'fixedRda', isMax: true },
+  { key: 'zinc_mg', label: 'Zinc', unit: 'mg', kind: 'fixedRda' },
+];
 
 const FOODS_BY_ID = {};
 FOODS.forEach(f => { FOODS_BY_ID[f.id] = f; });
@@ -640,10 +748,15 @@ let state = {
   // nutrient amounts per serving), then referenced by id from the daily
   // log below so you don't have to re-enter B12's dose every day.
   supplementLibrary: [],
+  // Multiplies every target in the nutrient panel by this many days -
+  // 1 is a normal daily view, higher values turn the targets into a
+  // shopping-list total for planning multiple days at once.
+  dayMultiplier: 1,
   entries: {}
 };
 BUCKET_KEYS.forEach(b => state.entries[b] = []);
 state.entries.supplements = []; // [{ supplementId, servings }, ...] - not a food-database bucket
+state.entries.notes = ''; // free text saved to the bottom of exported files
 
 // Nutrients being assembled for a NOT-YET-SAVED supplement in the add
 // form. Intentionally not part of `state`/not persisted - it's just
@@ -666,7 +779,8 @@ const ENTRIES_STORAGE_KEY = 'veganTracker_entries';
 function saveProfileToStorage() {
   localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify({
     profile: state.profile, targets: state.targets, label: state.label,
-    hiddenBuckets: state.hiddenBuckets, supplementLibrary: state.supplementLibrary
+    hiddenBuckets: state.hiddenBuckets, supplementLibrary: state.supplementLibrary,
+    dayMultiplier: state.dayMultiplier
   }));
 }
 function loadProfileFromStorage() {
@@ -679,6 +793,7 @@ function loadProfileFromStorage() {
     if (typeof parsed.label === 'string') state.label = parsed.label;
     if (Array.isArray(parsed.hiddenBuckets)) state.hiddenBuckets = parsed.hiddenBuckets;
     if (Array.isArray(parsed.supplementLibrary)) state.supplementLibrary = parsed.supplementLibrary;
+    if (typeof parsed.dayMultiplier === 'number') state.dayMultiplier = parsed.dayMultiplier;
   } catch (e) { console.error('Could not read saved profile', e); }
 
   // Migration: older saved profiles only stored protein_g/fat_g/carbs_g,
@@ -713,6 +828,7 @@ function loadEntriesFromStorage() {
     const parsed = JSON.parse(raw);
     BUCKET_KEYS.forEach(b => { state.entries[b] = parsed[b] || []; });
     state.entries.supplements = parsed.supplements || [];
+    state.entries.notes = parsed.notes || '';
   } catch (e) { console.error('Could not read saved food log', e); }
 }
 
@@ -825,6 +941,9 @@ function computeDailyTotals() {
       totals[nutrientKey] = (totals[nutrientKey] || 0) + amountPerServing * entry.servings;
     });
   });
+  // Net Carbs isn't a raw USDA field - it's carbs minus fiber, computed
+  // once here so the gauge bar can read it like any other nutrient.
+  totals.netCarbs_g = (totals.carbs_g || 0) - (totals.fiber_g || 0);
   return totals;
 }
 
@@ -844,13 +963,24 @@ function fmt(n) {
 
 // How much of today's total for these nutrient key(s) came from each food
 // you've actually logged, sorted highest-contribution first.
+// For most nutrients, "how much did this food contribute" is just a sum
+// of one or more raw per100g fields (keys.length is 2 for the few
+// combined-pair rows). Net Carbs is the one exception - it's carbs minus
+// fiber, a subtraction, not a sum - so it needs its own small helper.
+function amountForKeys(nutrientSource, keys) {
+  if (keys.length === 1 && keys[0] === 'netCarbs_g') {
+    return (nutrientSource.carbs_g || 0) - (nutrientSource.fiber_g || 0);
+  }
+  return keys.reduce((sum, k) => sum + (nutrientSource[k] || 0), 0);
+}
+
 function nutrientContributionBreakdown(keys) {
   const contributions = {}; // name -> amount so far today
   BUCKET_KEYS.forEach(bucket => {
     state.entries[bucket].forEach(entry => {
       const food = FOODS_BY_ID[entry.foodId];
       if (!food) return;
-      const amount = keys.reduce((sum, k) => sum + (food.per100g[k] || 0), 0) * entry.grams / 100;
+      const amount = amountForKeys(food.per100g, keys) * entry.grams / 100;
       if (amount <= 0) return;
       contributions[food.name] = (contributions[food.name] || 0) + amount;
     });
@@ -858,7 +988,7 @@ function nutrientContributionBreakdown(keys) {
   state.entries.supplements.forEach(entry => {
     const supp = state.supplementLibrary.find(s => s.id === entry.supplementId);
     if (!supp) return;
-    const amount = keys.reduce((sum, k) => sum + (supp.nutrients[k] || 0), 0) * entry.servings;
+    const amount = amountForKeys(supp.nutrients, keys) * entry.servings;
     if (amount <= 0) return;
     contributions[supp.name] = (contributions[supp.name] || 0) + amount;
   });
@@ -879,8 +1009,13 @@ const NUTRIENT_FUNCTIONS = {
   calories_kcal: 'Provides the energy your body needs for basic function, movement, and activity.',
   protein_g: 'Builds and repairs muscle, skin, and other tissues, and supports enzymes and hormones.',
   carbs_g: "The body's main energy source, especially for the brain and during exercise.",
+  netCarbs_g: 'Carbs minus fiber - the portion your body actually breaks down into usable sugar.',
   fat_g: 'Supplies concentrated energy, supports cell membranes, and helps absorb vitamins A, D, E and K.',
   fiber_g: 'Supports digestion, feeds gut bacteria, and helps regulate blood sugar and cholesterol.',
+  insolubleFiber_g: "Adds bulk to stool and speeds food through the digestive tract, supporting regularity.",
+  solubleFiber_g: 'Dissolves into a gel that slows digestion, helping regulate blood sugar and cholesterol.',
+  starch_g: 'A storage carbohydrate that breaks down into glucose for energy, more slowly than simple sugar.',
+  sugar_g: 'A fast energy source; naturally present in fruit and dairy, but easy to overdo via added sugar.',
   thiamin_mg: 'Helps convert food into energy and supports nerve function.',
   riboflavin_mg: 'Helps convert food into energy and supports skin, eye, and nerve health.',
   niacin_mg: 'Supports energy metabolism and helps maintain healthy skin and the nervous system.',
@@ -891,8 +1026,10 @@ const NUTRIENT_FUNCTIONS = {
   threonine_g: 'Supports collagen and elastin production, and immune and liver function.',
   tryptophan_g: 'A building block for serotonin and melatonin, supporting mood and sleep.',
   valine_g: 'Supports muscle growth, tissue repair, and energy production.',
-  'methionine_g,cystine_g': 'Sulfur-containing amino acids used to build proteins and antioxidants like glutathione.',
-  'phenylalanine_g,tyrosine_g': 'Used to build proteins and neurotransmitters, including dopamine and thyroid hormone.',
+  methionine_g: 'A sulfur-containing amino acid used to build proteins and antioxidants like glutathione.',
+  cystine_g: 'A sulfur-containing amino acid that supports antioxidant defense and hair/skin structure.',
+  phenylalanine_g: 'Used to build proteins and neurotransmitters, including dopamine and thyroid hormone.',
+  tyrosine_g: 'Used to build neurotransmitters (dopamine, adrenaline) and thyroid hormone.',
   calcium_mg: 'Builds and maintains bones and teeth, and supports muscle and nerve signaling.',
   iron_mg: 'Carries oxygen in red blood cells; low intake can lead to fatigue and anemia.',
   magnesium_mg: 'Supports muscle and nerve function, blood sugar control, and bone health.',
@@ -914,14 +1051,31 @@ const NUTRIENT_FUNCTIONS = {
   biotin_ug: 'Supports metabolism of fats, carbs, and protein, and helps maintain healthy hair and skin.',
   pantothenicAcid_mg: 'Helps convert food into energy and supports hormone production.',
   choline_mg: 'Supports brain development, liver function, and cell membrane structure.',
+  monounsaturatedFat_g: 'A "heart-healthy" fat that can help lower LDL cholesterol when it replaces saturated fat.',
+  polyunsaturatedFat_g: 'Includes essential omega-3 and omega-6 fats your body can\u2019t make on its own.',
+  omega3_g: 'Supports heart, brain, and eye health, and helps regulate inflammation.',
+  ala_g: 'A plant-based omega-3 fat; the body converts a small amount of it into EPA and DHA.',
+  dha_g: 'An omega-3 fat concentrated in the brain and eyes, supporting cognitive and visual function.',
+  epa_g: 'An omega-3 fat that helps regulate inflammation and supports heart health.',
+  omega6_g: 'An essential fat family used for cell membranes and signaling - most diets get plenty already.',
+  aa_g: 'An omega-6 fat used to build cell membranes and inflammatory signaling molecules.',
+  la_g: 'The most common omega-6 fat in most diets; essential in small amounts for cell membrane structure.',
+  saturatedFat_g: 'A fat type best kept moderate - diets high in it are linked to higher LDL cholesterol.',
+  transFat_g: 'An industrially-produced fat linked to heart disease risk - health guidance is to minimize it as much as possible.',
+  cholesterol_mg: 'A fat-like substance your body makes on its own; dietary limits are debated but still commonly tracked.',
 };
 
 const FOOD_SOURCE_SUGGESTIONS = {
   calories_kcal: ['Nuts & seeds', 'Oils', 'Whole grains', 'Dried fruit', 'Legumes'],
   protein_g: ['Legumes (beans, lentils)', 'Tofu & tempeh', 'Seitan', 'Nuts & seeds', 'Whole grains', 'Meat, poultry & fish (if eaten)'],
   carbs_g: ['Whole grains', 'Starchy vegetables (potatoes, corn)', 'Fruit', 'Legumes'],
+  netCarbs_g: ['Whole grains', 'Starchy vegetables (potatoes, corn)', 'Fruit', 'Legumes'],
   fat_g: ['Nuts & seeds', 'Cooking oils', 'Avocado', 'Fatty fish (if eaten)'],
   fiber_g: ['Legumes', 'Whole grains', 'Vegetables', 'Fruit with the skin on', 'Nuts & seeds'],
+  insolubleFiber_g: ['Whole wheat products', 'Vegetables', 'Wheat bran', 'Nuts & seeds'],
+  solubleFiber_g: ['Oats', 'Beans & lentils', 'Apples & citrus fruit', 'Flaxseed'],
+  starch_g: ['Grains', 'Potatoes & corn', 'Legumes', 'Winter squash'],
+  sugar_g: ['Fruit', 'Dairy (if eaten)', 'Sweets & desserts', 'Sweetened beverages'],
   thiamin_mg: ['Whole grains', 'Legumes', 'Sunflower seeds', 'Fortified cereals', 'Pork (if eaten)'],
   riboflavin_mg: ['Leafy greens', 'Almonds', 'Fortified cereals', 'Dairy & eggs (if eaten)'],
   niacin_mg: ['Peanuts', 'Whole grains', 'Mushrooms', 'Meat, poultry & fish (if eaten)'],
@@ -932,8 +1086,10 @@ const FOOD_SOURCE_SUGGESTIONS = {
   threonine_g: ['Legumes', 'Soy foods', 'Nuts & seeds', 'Whole grains'],
   tryptophan_g: ['Soy foods', 'Oats', 'Pumpkin & sesame seeds', 'Legumes'],
   valine_g: ['Soy foods', 'Legumes', 'Nuts & seeds', 'Whole grains'],
-  'methionine_g,cystine_g': ['Whole grains (oats, corn)', 'Brazil nuts & sunflower seeds', 'Soy foods', 'Meat & dairy (if eaten)'],
-  'phenylalanine_g,tyrosine_g': ['Soy foods', 'Legumes', 'Nuts & seeds', 'Whole grains', 'Meat & dairy (if eaten)'],
+  methionine_g: ['Whole grains (oats, corn)', 'Brazil nuts & sunflower seeds', 'Soy foods', 'Meat & dairy (if eaten)'],
+  cystine_g: ['Whole grains', 'Legumes', 'Nuts & seeds', 'Eggs & dairy (if eaten)'],
+  phenylalanine_g: ['Soy foods', 'Legumes', 'Nuts & seeds', 'Whole grains', 'Meat & dairy (if eaten)'],
+  tyrosine_g: ['Soy foods', 'Legumes', 'Nuts & seeds', 'Meat & dairy (if eaten)'],
   calcium_mg: ['Fortified plant milks', 'Calcium-set tofu', 'Leafy greens (kale, bok choy)', 'Sesame seeds & tahini', 'Dairy (if eaten)'],
   iron_mg: ['Legumes', 'Dark leafy greens', 'Pumpkin seeds', 'Quinoa', 'Dried fruit', 'Fortified cereals'],
   magnesium_mg: ['Nuts & seeds', 'Legumes', 'Whole grains', 'Dark leafy greens', 'Dark chocolate'],
@@ -955,6 +1111,18 @@ const FOOD_SOURCE_SUGGESTIONS = {
   biotin_ug: ['Nuts & seeds', 'Legumes', 'Whole grains', 'Egg yolk (if eaten)'],
   pantothenicAcid_mg: ['Whole grains', 'Legumes', 'Mushrooms', 'Avocado'],
   choline_mg: ['Soy foods', 'Cruciferous vegetables', 'Quinoa', 'Eggs (if eaten)'],
+  monounsaturatedFat_g: ['Olive oil', 'Avocado', 'Almonds & cashews', 'Peanut butter'],
+  polyunsaturatedFat_g: ['Walnuts', 'Flaxseed & chia seeds', 'Sunflower & corn oil', 'Fatty fish (if eaten)'],
+  omega3_g: ['Flaxseed & chia seeds', 'Walnuts', 'Algae-based supplements', 'Fatty fish (if eaten)'],
+  ala_g: ['Flaxseed & flaxseed oil', 'Chia seeds', 'Walnuts', 'Canola & soybean oil'],
+  dha_g: ['Algae-based supplements', 'Fatty fish (if eaten)', 'Fortified foods (some plant milks/eggs)'],
+  epa_g: ['Algae-based supplements', 'Fatty fish (if eaten)'],
+  omega6_g: ['Vegetable oils (corn, soybean, sunflower)', 'Nuts & seeds', 'Poultry (if eaten)'],
+  aa_g: ['Meat, poultry & eggs (if eaten)', 'Small amounts made naturally by the body from LA'],
+  la_g: ['Sunflower, safflower & corn oil', 'Walnuts', 'Sunflower seeds', 'Soybean oil'],
+  saturatedFat_g: ['Coconut & palm oil', 'Butter & full-fat dairy (if eaten)', 'Fatty cuts of meat (if eaten)', 'Baked goods'],
+  transFat_g: ['Partially hydrogenated oils', 'Some fried & fast foods', 'Some packaged baked goods'],
+  cholesterol_mg: ['Eggs (if eaten)', 'Shellfish (if eaten)', 'Dairy & meat (if eaten)'],
 };
 
 function buildNutrientTooltipHtml(keys, label, unit) {
@@ -1051,6 +1219,8 @@ function renderProfileForm() {
   document.getElementById('inputGender').value = state.profile.gender;
   document.getElementById('inputActivity').value = state.profile.activity;
   document.getElementById('inputLabel').value = state.label;
+  document.getElementById('inputDayMultiplier').value = state.dayMultiplier;
+  document.getElementById('inputNotes').value = state.entries.notes;
 }
 
 function renderSliders() {
@@ -1072,47 +1242,82 @@ function renderSliders() {
   document.getElementById('macroPctSum').textContent = s.proteinPct + s.fatPct + s.carbsPct;
 }
 
+// A row with no defensible numeric target - just shows the logged amount,
+// with an optional note (e.g. "not measured in this database"). Still
+// carries the same data attributes so the hover tooltip works on it too.
+function infoRow(key, label, actual, unit, note) {
+  return `<div class="nrow info-row" data-nutrient-key="${key}" data-nutrient-label="${label}" data-nutrient-unit="${unit}">
+    <div class="nline"><span>${label}</span><span class="amt">${fmt(actual)} ${unit} logged${note ? ' - ' + note : ''}</span></div>
+  </div>`;
+}
+
+// Dispatches one row descriptor (see the CARB_ROWS/LIPID_ROWS/etc arrays
+// above) to the right target-calculation method, then hands off to
+// gaugeRow (or infoRow) to actually render it.
+function renderNutrientRow(row, ctx) {
+  const { totals, effectiveKcal, effectiveProteinG, effectiveTargets, rda, gender, days } = ctx;
+  const actual = totals[row.key] || 0;
+  const opts = {};
+  if (row.isMax) opts.isMax = true;
+  if (row.ceiling) opts.ceiling = row.ceiling;
+
+  switch (row.kind) {
+    case 'macro':
+      return gaugeRow(row.key, row.label, actual, effectiveTargets[row.key], row.unit, opts);
+    case 'netCarbs': {
+      const fiberTarget = calorieLinkedTargets(effectiveKcal).fiber_g;
+      const target = effectiveTargets.carbs_g - fiberTarget;
+      return gaugeRow(row.key, row.label, actual, target, row.unit, opts);
+    }
+    case 'calorieLinked':
+      return gaugeRow(row.key, row.label, actual, calorieLinkedTargets(effectiveKcal)[row.key], row.unit, opts);
+    case 'proteinScaled': {
+      const mgPerG = AMINO_PATTERN_MG_PER_G_PROTEIN[row.key];
+      const target = (mgPerG * effectiveProteinG) / 1000;
+      return gaugeRow(row.key, row.label, actual, target, row.unit, opts);
+    }
+    case 'fixedRda':
+      return gaugeRow(row.key, row.label, actual, (rda[row.key] || 0) * days, row.unit, opts);
+    case 'pctCalories': {
+      const limit = PERCENT_CALORIE_LIMITS[row.key];
+      const target = limit.pct * effectiveKcal / limit.calsPerGram;
+      return gaugeRow(row.key, row.label, actual, target, row.unit, opts);
+    }
+    case 'aiTarget':
+      return gaugeRow(row.key, row.label, actual, OMEGA_AI_TARGETS[row.key][gender] * days, row.unit, opts);
+    case 'fixedTarget': {
+      const amount = row.amount !== undefined ? row.amount : FIXED_LIMITS_MG[row.key];
+      return gaugeRow(row.key, row.label, actual, amount * days, row.unit, opts);
+    }
+    case 'info':
+    default:
+      return infoRow(row.key, row.label, actual, row.unit, row.note);
+  }
+}
+
 function renderNutrientProgress() {
   const totals = computeDailyTotals();
-  const kcalTarget = state.targets.calories;
-
-  // --- Macros ---
-  let mh = '';
-  mh += gaugeRow('calories_kcal', 'Calories', totals.calories_kcal || 0, kcalTarget, 'kcal', {});
-  mh += gaugeRow('protein_g', 'Protein', totals.protein_g || 0, state.targets.protein_g, 'g', {});
-  mh += gaugeRow('carbs_g', 'Carbs', totals.carbs_g || 0, state.targets.carbs_g, 'g', {});
-  mh += gaugeRow('fat_g', 'Fat', totals.fat_g || 0, state.targets.fat_g, 'g', {});
-  document.getElementById('macroBars').innerHTML = mh;
-
-  // --- Fiber + calorie-linked B-vitamins ---
-  const calLinked = calorieLinkedTargets(kcalTarget);
-  let ch = '';
-  CAL_LINKED_META.forEach(([key, label, unit]) => {
-    ch += gaugeRow(key, label, totals[key] || 0, calLinked[key], unit, {});
-  });
-  document.getElementById('calLinkedBars').innerHTML = ch;
-
-  // --- Essential amino acids (scaled to protein target) ---
-  const proteinTarget = state.targets.protein_g;
-  let ah = '';
-  Object.entries(AMINO_PATTERN_MG_PER_G_PROTEIN).forEach(([key, mgPerG]) => {
-    const targetG = (mgPerG * proteinTarget) / 1000;
-    ah += gaugeRow(key, AMINO_LABELS[key], totals[key] || 0, targetG, 'g', {});
-  });
-  AMINO_COMBINED_PATTERN.forEach(({ keys, mgPerGProtein, label }) => {
-    const targetG = (mgPerGProtein * proteinTarget) / 1000;
-    const current = keys.reduce((sum, k) => sum + (totals[k] || 0), 0);
-    ah += gaugeRow(keys, label, current, targetG, 'g', {});
-  });
-  document.getElementById('aminoBars').innerHTML = ah;
-
-  // --- Vitamins & minerals (fixed by sex/age) ---
+  const days = state.dayMultiplier || 1;
+  const gender = state.profile.gender;
   const rda = RDA_TABLE[currentRdaKey()];
-  let vh = '';
-  NUTRIENT_META.forEach(([key, label, unit, opts]) => {
-    vh += gaugeRow(key, label, totals[key] || 0, rda[key], unit, opts);
-  });
-  document.getElementById('vitBars').innerHTML = vh;
+
+  const effectiveKcal = state.targets.calories * days;
+  const effectiveTargets = {
+    calories_kcal: effectiveKcal,
+    protein_g: state.targets.protein_g * days,
+    fat_g: state.targets.fat_g * days,
+    carbs_g: state.targets.carbs_g * days,
+  };
+  const effectiveProteinG = state.targets.protein_g * days;
+  const ctx = { totals, effectiveKcal, effectiveProteinG, effectiveTargets, rda, gender, days };
+
+  document.getElementById('caloriesBar').innerHTML =
+    gaugeRow('calories_kcal', 'Calories', totals.calories_kcal || 0, effectiveKcal, 'kcal', {});
+  document.getElementById('carbBars').innerHTML = CARB_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
+  document.getElementById('lipidBars').innerHTML = LIPID_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
+  document.getElementById('proteinBars').innerHTML = PROTEIN_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
+  document.getElementById('vitaminBars').innerHTML = VITAMIN_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
+  document.getElementById('mineralBars').innerHTML = MINERAL_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
 }
 
 // ---- Food group sections ----
@@ -1426,10 +1631,12 @@ function buildExportData() {
   return {
     label: state.label,
     exportedOn: todayString(),
+    dayMultiplier: state.dayMultiplier,
     targets: state.targets,
     totals: computeDailyTotals(),
     foods: entriesExpanded,
-    supplements: supplementsExpanded
+    supplements: supplementsExpanded,
+    notes: state.entries.notes
   };
 }
 
@@ -1451,6 +1658,12 @@ function exportCsv() {
       .join('; ');
     lines.push(`Supplements,"${item.name}",${item.servings} serving(s),"${nutrientSummary}"`);
   });
+  if (data.notes && data.notes.trim() !== '') {
+    lines.push('');
+    lines.push('Notes');
+    // Quote-escape the notes field in case it contains commas/quotes/newlines.
+    lines.push('"' + data.notes.replace(/"/g, '""') + '"');
+  }
   triggerDownload(`vegan-tracker-${sanitizedLabelForFilename()}.csv`, lines.join('\n'), 'text/csv');
 }
 function exportText() {
@@ -1480,11 +1693,15 @@ function exportText() {
     }
     out += '\n';
   });
-  out += 'Daily totals:\n';
-  out += `  Calories: ${fmt(data.totals.calories_kcal || 0)} / ${data.targets.calories} kcal\n`;
-  out += `  Protein: ${fmt(data.totals.protein_g || 0)} / ${data.targets.protein_g} g\n`;
-  out += `  Fat: ${fmt(data.totals.fat_g || 0)} / ${data.targets.fat_g} g\n`;
-  out += `  Carbs: ${fmt(data.totals.carbs_g || 0)} / ${data.targets.carbs_g} g\n`;
+  out += `Daily totals${data.dayMultiplier > 1 ? ` (x${data.dayMultiplier} days)` : ''}:\n`;
+  out += `  Calories: ${fmt(data.totals.calories_kcal || 0)} / ${data.targets.calories * data.dayMultiplier} kcal\n`;
+  out += `  Protein: ${fmt(data.totals.protein_g || 0)} / ${data.targets.protein_g * data.dayMultiplier} g\n`;
+  out += `  Fat: ${fmt(data.totals.fat_g || 0)} / ${data.targets.fat_g * data.dayMultiplier} g\n`;
+  out += `  Carbs: ${fmt(data.totals.carbs_g || 0)} / ${data.targets.carbs_g * data.dayMultiplier} g\n`;
+  if (data.notes && data.notes.trim() !== '') {
+    out += '\n' + '='.repeat(40) + '\n';
+    out += 'Notes:\n' + data.notes + '\n';
+  }
   triggerDownload(`vegan-tracker-${sanitizedLabelForFilename()}.txt`, out, 'text/plain');
 }
 
@@ -1538,6 +1755,43 @@ function wireLabelInput() {
   });
 }
 
+function wireNotesInput() {
+  document.getElementById('inputNotes').addEventListener('input', e => {
+    state.entries.notes = e.target.value;
+    saveEntriesToStorage();
+  });
+}
+
+// ---- Day multiplier ----
+function adjustDayMultiplier(delta) {
+  setDayMultiplier(state.dayMultiplier + delta);
+}
+function setDayMultiplier(value) {
+  state.dayMultiplier = clamp(Math.round(parseFloat(value) || 1), 1, 10);
+  document.getElementById('inputDayMultiplier').value = state.dayMultiplier;
+  saveProfileToStorage();
+  renderNutrientProgress();
+}
+
+// ---- Full reset ----
+// Clears every food-group entry AND the supplement log (but keeps your
+// supplement library definitions, hidden-category choices, and profile
+// targets intact - only the "what did I log" data goes away).
+function resetAllFoods() {
+  const confirmed = confirm('Clear every food and supplement logged? This can\'t be undone.');
+  if (!confirmed) return;
+  BUCKET_KEYS.forEach(b => { state.entries[b] = []; });
+  state.entries.supplements = [];
+  saveEntriesToStorage();
+  renderFoodGroups();
+  renderSupplementsSection();
+  renderNutrientProgress();
+}
+
+function wireResetButton() {
+  document.getElementById('btnResetFoods').addEventListener('click', resetAllFoods);
+}
+
 function wireExportButtons() {
   document.getElementById('btnExportJson').addEventListener('click', exportJson);
   document.getElementById('btnExportCsv').addEventListener('click', exportCsv);
@@ -1552,6 +1806,8 @@ function init() {
   renderSliders();
   wireProfileControls();
   wireLabelInput();
+  wireNotesInput();
+  wireResetButton();
   wireExportButtons();
   renderSupplementsSection();
   renderFoodGroups();
