@@ -315,7 +315,6 @@
     <div class="macro-grid">
       <div class="macro-box">
         <div class="mlabel"><span class="name">Calories</span><span class="val" id="calVal"></span></div>
-        <input type="range" id="sliderCalories" min="1000" max="5000" step="10">
         <div class="gram-control" style="justify-content:center;margin-top:6px;">
           <button onclick="adjustCalories(-10)">-</button>
           <input type="number" id="inputCalories" min="1000" max="5000" step="10"
@@ -1257,7 +1256,6 @@ function renderProfileForm() {
 
 function renderSliders() {
   const s = state.targets;
-  document.getElementById('sliderCalories').value = s.calories;
   document.getElementById('inputCalories').value = s.calories;
   document.getElementById('calVal').textContent = s.calories;
 
@@ -1957,12 +1955,11 @@ function wireProfileControls() {
   });
   document.getElementById('btnRecalc').addEventListener('click', recalculateTargetsFromProfile);
 
-  // Calories slider: the macro PERCENTAGES stay exactly as they are - only
-  // the derived gram amounts change, since they're calories * pct / 100.
-  document.getElementById('sliderCalories').addEventListener('input', e => {
-    setCalories(e.target.value);
-  });
-  // Protein/Fat/Carbs are now percentage steppers (adjustMacroPercent /
+  // Calories is a +/- stepper (adjustCalories/setCalories, wired directly
+  // from its buttons/input in the HTML) - the macro PERCENTAGES stay
+  // exactly as they are when it changes; only the derived gram amounts
+  // update, since they're calories * pct / 100.
+  // Protein/Fat/Carbs are also percentage steppers (adjustMacroPercent /
   // setMacroPercent, called directly from their buttons/input in the HTML)
   // rather than sliders, so there's no separate wiring needed here.
 }
