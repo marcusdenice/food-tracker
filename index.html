@@ -121,6 +121,15 @@
     margin: 0 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px;
     display: flex; justify-content: space-between; align-items: center;
   }
+  .category-label-input {
+    font: inherit; text-transform: inherit; letter-spacing: inherit; color: inherit;
+    background: transparent; border: none; border-bottom: 1px dashed transparent;
+    padding: 0; flex: 1; min-width: 0;
+  }
+  .category-label-input:hover { border-bottom-color: var(--line); }
+  .category-label-input:focus {
+    outline: none; border-bottom: 1px solid var(--moss); background: var(--paper);
+  }
   .remove-category-btn {
     background: none; border: none; color: var(--rust); font-size: 1rem; padding: 0 4px;
     cursor: pointer; text-transform: none; letter-spacing: 0; font-family: var(--font-body);
@@ -513,34 +522,13 @@ const CALORIES_PER_GRAM = { protein: 4, fat: 9, carbs: 4 };
 // Every food in foods.js carries a raw USDA category in `group`. We bucket
 // those raw categories into friendlier sections. This is the only place
 // that mapping lives, so it's easy to reshuffle later.
-const CATEGORY_TO_BUCKET = {
-  'Vegetables and Vegetable Products': 'vegetables',
-  'Fruits and Fruit Juices': 'fruits',
-  'Legumes and Legume Products': 'legumes',
-  'Cereal Grains and Pasta': 'grains',
-  'Breakfast Cereals': 'grains',
-  'Nut and Seed Products': 'nutsSeeds',
-  'Fats and Oils': 'fatsOils',
-  'Baked Products': 'bakedGoods',
-  'Sweets': 'sweetsSnacks',
-  'Snacks': 'sweetsSnacks',
-  'Beverages': 'beverages',
-  'Spices and Herbs': 'spicesHerbs',
-  'Dairy and Egg Products': 'dairyEggs',
-  'Poultry Products': 'meatPoultry',
-  'Sausages and Luncheon Meats': 'meatPoultry',
-  'Pork Products': 'meatPoultry',
-  'Beef Products': 'meatPoultry',
-  'Lamb, Veal, and Game Products': 'meatPoultry',
-  'Finfish and Shellfish Products': 'seafood',
-  'Soups, Sauces, and Gravies': 'soupsSauces',
-  'Fast Foods': 'mixedDishes',
-  'Restaurant Foods': 'mixedDishes',
-  'Meals, Entrees, and Side Dishes': 'mixedDishes',
-  'Baby Foods': 'mixedDishes',
-  'American Indian/Alaska Native Foods': 'mixedDishes',
-  'Branded Food Products Database': 'mixedDishes',
-};
+// The category ("bucket") a food's row goes into is now purely something
+// YOU choose when adding it (via the dropdown-free-for-all search below),
+// not something derived from its original USDA category - so unlike
+// earlier versions of this app, there's no USDA-category-to-bucket
+// mapping here anymore. BUCKET_KEYS below is just the fixed list of
+// section slots the UI has (their default names live in BUCKET_LABELS,
+// freely renamable via getBucketLabel()/setBucketLabel()).
 const BUCKET_KEYS = ['vegetables', 'fruits', 'legumes', 'grains', 'nutsSeeds',
   'fatsOils', 'bakedGoods', 'sweetsSnacks', 'beverages', 'spicesHerbs',
   'dairyEggs', 'meatPoultry', 'seafood', 'soupsSauces', 'mixedDishes'];
@@ -552,6 +540,11 @@ const BUCKET_LABELS = {
   seafood: 'Fish & Seafood', soupsSauces: 'Soups, Sauces & Gravies',
   mixedDishes: 'Mixed Dishes & Restaurant Foods',
 };
+// Returns the CURRENT display name for a bucket - your custom name if
+// you've renamed it, otherwise the default above.
+function getBucketLabel(bucket) {
+  return (state.bucketLabels && state.bucketLabels[bucket]) || BUCKET_LABELS[bucket];
+}
 
 // ---- Vitamin & mineral daily targets, fixed by sex/age (NIH ODS RDAs) ----
 // These do NOT change with calories or protein - that's real physiology.
@@ -690,21 +683,13 @@ const MINERAL_ROWS = [
 
 // FOODS starts empty and is populated by loadFoodsCsv() below, once the
 // fetch of foods.csv resolves - everything that reads FOODS (including
-// these two indices) has to wait for that, so they're built by
-// buildFoodIndices() rather than immediately here.
+// this index) has to wait for that, so it's built by buildFoodIndices()
+// rather than immediately here.
 let FOODS = [];
 let FOODS_BY_ID = {};
-let FOODS_BY_BUCKET = {};
 function buildFoodIndices() {
   FOODS_BY_ID = {};
   FOODS.forEach(f => { FOODS_BY_ID[f.id] = f; });
-
-  FOODS_BY_BUCKET = {};
-  BUCKET_KEYS.forEach(b => FOODS_BY_BUCKET[b] = []);
-  FOODS.forEach(f => {
-    const bucket = CATEGORY_TO_BUCKET[f.group];
-    if (bucket) FOODS_BY_BUCKET[bucket].push(f);
-  });
 }
 
 // ---- Supplements ----
@@ -806,6 +791,11 @@ let state = {
   // separate from the food log itself - hiding a category just declutters
   // the "Your Foods" panel, it doesn't delete anything already logged in it.
   hiddenBuckets: [],
+  // Custom names for the "Your Foods" section headings, keyed by bucket
+  // id (e.g. bucketLabels.vegetables = 'Breakfast'). Only present here
+  // once you've actually renamed one - anything not in this object just
+  // falls back to its default label via getBucketLabel() below.
+  bucketLabels: {},
   // Your personal supplement "cabinet" - each one defined once (name +
   // nutrient amounts per serving), then referenced by id from the daily
   // log below so you don't have to re-enter B12's dose every day.
@@ -842,6 +832,7 @@ function saveProfileToStorage() {
   localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify({
     profile: state.profile, targets: state.targets, label: state.label,
     hiddenBuckets: state.hiddenBuckets, supplementLibrary: state.supplementLibrary,
+    bucketLabels: state.bucketLabels,
     dayMultiplier: state.dayMultiplier
   }));
 }
@@ -855,6 +846,7 @@ function loadProfileFromStorage() {
     if (typeof parsed.label === 'string') state.label = parsed.label;
     if (Array.isArray(parsed.hiddenBuckets)) state.hiddenBuckets = parsed.hiddenBuckets;
     if (Array.isArray(parsed.supplementLibrary)) state.supplementLibrary = parsed.supplementLibrary;
+    if (parsed.bucketLabels && typeof parsed.bucketLabels === 'object') state.bucketLabels = parsed.bucketLabels;
     if (typeof parsed.dayMultiplier === 'number') state.dayMultiplier = parsed.dayMultiplier;
   } catch (e) { console.error('Could not read saved profile', e); }
 
@@ -1392,7 +1384,7 @@ function renderFoodGroups() {
   if (hiddenBuckets.length > 0) {
     html += `<div class="hidden-categories-row">
       <span style="color:var(--ink-soft);font-size:12px;">Hidden:</span>
-      ${hiddenBuckets.map(b => `<button class="chip" onclick="showBucket('${b}')">+ ${BUCKET_LABELS[b]}</button>`).join('')}
+      ${hiddenBuckets.map(b => `<button class="chip" onclick="showBucket('${b}')">+ ${getBucketLabel(b)}</button>`).join('')}
     </div>`;
   }
   container.innerHTML = html;
@@ -1421,6 +1413,20 @@ function showBucket(bucket) {
   renderFoodGroups();
 }
 
+// Renames a category heading. Clearing it back to blank (or retyping the
+// original default name) reverts to the default rather than leaving a
+// pointless override saved.
+function setBucketLabel(bucket, value) {
+  const trimmed = value.trim();
+  if (trimmed === '' || trimmed === BUCKET_LABELS[bucket]) {
+    delete state.bucketLabels[bucket];
+  } else {
+    state.bucketLabels[bucket] = trimmed;
+  }
+  saveProfileToStorage();
+  renderFoodGroups(); // refreshes this label everywhere it's shown (hidden-chips list, etc.)
+}
+
 function buildFoodGroupHtml(bucket) {
   const entries = state.entries[bucket];
   let rows = '';
@@ -1429,11 +1435,16 @@ function buildFoodGroupHtml(bucket) {
   } else {
     rows = entries.map((entry, idx) => buildFoodRowHtml(bucket, entry, idx)).join('');
   }
+  const label = getBucketLabel(bucket);
   return `
     <div class="food-group">
-      <h3><span>${BUCKET_LABELS[bucket]}</span><button class="remove-category-btn" onclick="hideBucket('${bucket}')" title="Remove this category from view">&times;</button></h3>
+      <h3>
+        <input type="text" class="category-label-input" value="${label.replace(/"/g, '&quot;')}"
+               onchange="setBucketLabel('${bucket}', this.value)" title="Click to rename this category">
+        <button class="remove-category-btn" onclick="hideBucket('${bucket}')" title="Remove this category from view">&times;</button>
+      </h3>
       <div class="food-search-wrap">
-        <input type="text" id="search-${bucket}" placeholder="Search ${BUCKET_LABELS[bucket].toLowerCase()}...">
+        <input type="text" id="search-${bucket}" placeholder="Search all foods to add...">
         <div class="search-results" id="searchResults-${bucket}"></div>
       </div>
       <div id="rows-${bucket}">${rows}</div>
@@ -1624,7 +1635,10 @@ function onFoodSearchInput(bucket) {
     wrap.classList.remove('dropdown-active');
     return;
   }
-  const matches = FOODS_BY_BUCKET[bucket].filter(f => f.name.toLowerCase().includes(query)).slice(0, 25);
+  // Searches ALL foods, not just this bucket's original USDA category -
+  // since category names are now freely renamable (e.g. "Breakfast"),
+  // restricting by original food type no longer makes sense.
+  const matches = FOODS.filter(f => f.name.toLowerCase().includes(query)).slice(0, 25);
   resultsDiv.innerHTML = matches.map(f =>
     `<div onclick="addFood('${bucket}', ${f.id})">${f.name}</div>`
   ).join('');
@@ -1690,12 +1704,20 @@ function buildExportData() {
       nutrients: supp ? supp.nutrients : {}
     };
   });
+  // Category display names at the time of export - "foods" below is
+  // still keyed by the stable internal bucket id (so re-importing this
+  // file works reliably even if you rename things later), but this map
+  // records what you'd actually renamed each one to at export time.
+  const categoryLabels = {};
+  BUCKET_KEYS.forEach(bucket => { categoryLabels[bucket] = getBucketLabel(bucket); });
+
   return {
     label: state.label,
     exportedOn: todayString(),
     dayMultiplier: state.dayMultiplier,
     targets: state.targets,
     totals: computeDailyTotals(),
+    categoryLabels: categoryLabels,
     foods: entriesExpanded,
     supplements: supplementsExpanded,
     notes: state.entries.notes
@@ -1711,7 +1733,7 @@ function exportCsv() {
   let lines = ['Food Group,Food,Grams,Calories'];
   BUCKET_KEYS.forEach(bucket => {
     data.foods[bucket].forEach(item => {
-      lines.push(`${BUCKET_LABELS[bucket]},"${item.name}",${item.grams},${item.calories}`);
+      lines.push(`${getBucketLabel(bucket)},"${item.name}",${item.grams},${item.calories}`);
     });
   });
   data.supplements.forEach(item => {
@@ -1745,7 +1767,7 @@ function exportText() {
   }
   out += '\n';
   BUCKET_KEYS.forEach(bucket => {
-    out += BUCKET_LABELS[bucket] + ':\n';
+    out += getBucketLabel(bucket) + ':\n';
     if (data.foods[bucket].length === 0) {
       out += '  (nothing logged)\n';
     } else {
@@ -1954,7 +1976,10 @@ function parseImportFromCsv(text) {
   const unmatched = [];
 
   const labelToBucket = {};
-  BUCKET_KEYS.forEach(b => { labelToBucket[BUCKET_LABELS[b]] = b; });
+  BUCKET_KEYS.forEach(b => {
+    labelToBucket[BUCKET_LABELS[b]] = b;   // the original default name still matches
+    labelToBucket[getBucketLabel(b)] = b;  // ...as does whatever it's currently renamed to
+  });
   const labelToNutrientKey = {};
   SUPPLEMENT_NUTRIENT_OPTIONS.forEach(([key, label]) => { labelToNutrientKey[label] = key; });
 
