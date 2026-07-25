@@ -139,6 +139,29 @@
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px;
   }
 
+  /* ---------- custom food builder ---------- */
+  .nutrient-builder-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .nutrient-builder-row select {
+    flex: 1; min-width: 160px; padding: 6px; border: 1px solid var(--line); border-radius: 2px;
+    font-family: var(--font-body); font-size: 0.85rem; background: #fff;
+  }
+  .nutrient-builder-row input[type="number"] {
+    width: 150px; padding: 6px; border: 1px solid var(--line); border-radius: 2px;
+    font-family: var(--font-mono); background: #fff;
+  }
+  .draft-nutrient-chip {
+    display: inline-flex; align-items: center; gap: 4px; background: var(--paper);
+    border: 1px solid var(--line); border-radius: 20px; padding: 3px 4px 3px 10px;
+    font-size: 0.78rem; margin: 0 6px 6px 0;
+  }
+  .draft-nutrient-chip button {
+    background: none; border: none; color: var(--rust); cursor: pointer; font-size: 0.9rem; padding: 0 4px;
+  }
+  .custom-food-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 0.88rem;
+  }
+
   .food-search-wrap {
     position: relative;
     z-index: 1;
@@ -453,6 +476,44 @@
     <button class="chip" id="btnDownloadFoodsDb" style="margin-top:6px;">Download Current Food Database (CSV)</button>
   </div>
 
+  <!-- ============================================================
+       ADD A CUSTOM FOOD
+       For anything that isn't in foods.csv - a homemade recipe, a
+       specific product, whatever. Not tied to any one category: once
+       saved, it's searchable/addable from any of the sections above,
+       exactly like a database food.
+       ============================================================ -->
+  <div class="panel">
+    <h2>Add a Custom Food</h2>
+    <p style="color:var(--ink-soft); font-size:0.88rem; margin-top:-6px;">
+      For anything not already in your food database. Once saved, search for it by name in whichever
+      category above makes sense - it's not locked to one section.
+    </p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:10px;">
+      <div class="field" style="flex:1; min-width:200px;">
+        <label for="customFoodNameInput">Food name</label>
+        <input type="text" id="customFoodNameInput" placeholder="e.g. Grandma's granola">
+      </div>
+      <div class="field">
+        <label for="customFoodServingSize">Serving size on label (g)</label>
+        <input type="number" id="customFoodServingSize" value="100" min="0.1" step="0.1" style="width:110px;">
+      </div>
+    </div>
+    <p style="color:var(--ink-soft); font-size:0.8rem; margin:8px 0 0;">
+      Enter each nutrient amount as it appears on the label for that serving size - we'll convert everything to
+      per-100g automatically when you save.
+    </p>
+    <div class="nutrient-builder-row" style="margin-top:8px;">
+      <select id="customFoodNutrientSelect"></select>
+      <input type="number" id="customFoodNutrientAmount" placeholder="Amount for that serving" step="any">
+      <button class="chip" id="btnAddNutrientToCustomFood">+ Add nutrient</button>
+    </div>
+    <div id="customFoodDraftList"></div>
+    <button class="chip" id="btnSaveCustomFood">Save Custom Food</button>
+
+    <div id="customFoodsListDisplay" style="margin-top:16px;"></div>
+  </div>
+
 </div>
 
 <footer class="note">
@@ -702,6 +763,11 @@ let state = {
   // once you've actually renamed one - anything not in this object just
   // falls back to its default label via getBucketLabel() below.
   bucketLabels: {},
+  // Foods you've defined yourself (name + nutrients per 100g) that aren't
+  // in foods.csv. Persisted separately from both the database file and
+  // the daily log - once created, one behaves exactly like any other
+  // database food and can be searched/added into any category.
+  customFoods: [],
   // Multiplies every target in the nutrient panel by this many days -
   // 1 is a normal daily view, higher values turn the targets into a
   // shopping-list total for planning multiple days at once.
@@ -732,7 +798,8 @@ function saveProfileToStorage() {
     profile: state.profile, targets: state.targets, label: state.label,
     hiddenBuckets: state.hiddenBuckets,
     bucketLabels: state.bucketLabels,
-    dayMultiplier: state.dayMultiplier
+    dayMultiplier: state.dayMultiplier,
+    customFoods: state.customFoods
   }));
 }
 function loadProfileFromStorage() {
@@ -746,6 +813,7 @@ function loadProfileFromStorage() {
     if (Array.isArray(parsed.hiddenBuckets)) state.hiddenBuckets = parsed.hiddenBuckets;
     if (parsed.bucketLabels && typeof parsed.bucketLabels === 'object') state.bucketLabels = parsed.bucketLabels;
     if (typeof parsed.dayMultiplier === 'number') state.dayMultiplier = parsed.dayMultiplier;
+    if (Array.isArray(parsed.customFoods)) state.customFoods = parsed.customFoods;
   } catch (e) { console.error('Could not read saved profile', e); }
 
   // Migration: older saved profiles only stored protein_g/fat_g/carbs_g,
@@ -1365,7 +1433,13 @@ function onFoodSearchInput(bucket) {
   // Searches ALL foods, not just this bucket's original USDA category -
   // since category names are now freely renamable (e.g. "Breakfast"),
   // restricting by original food type no longer makes sense.
-  const matches = FOODS.filter(f => f.name.toLowerCase().includes(query)).slice(0, 25);
+  // Custom foods you've added are sorted first, so a common search term
+  // (e.g. "granola") can't bury your own entry under 25+ database
+  // matches before it ever gets sliced off.
+  const allMatches = FOODS.filter(f => f.name.toLowerCase().includes(query));
+  const customMatches = allMatches.filter(f => f.id >= 900000000);
+  const otherMatches = allMatches.filter(f => f.id < 900000000);
+  const matches = customMatches.concat(otherMatches).slice(0, 25);
   resultsDiv.innerHTML = matches.map(f =>
     `<div onclick="addFood('${bucket}', ${f.id})">${f.name}</div>`
   ).join('');
@@ -1520,6 +1594,35 @@ const FOOD_CSV_NUTRIENT_COLUMNS = [
   'phosphorus_mg', 'potassium_mg', 'selenium_ug', 'sodium_mg', 'zinc_mg',
 ];
 
+// Friendly label + unit for each of the columns above, used to populate
+// the "Add a Custom Food" nutrient dropdown. Derived from the same
+// column list so the two can never drift out of sync.
+const CUSTOM_FOOD_NUTRIENT_LABELS = {
+  calories_kcal: ['Calories', 'kcal'], protein_g: ['Protein', 'g'], fat_g: ['Fat', 'g'],
+  carbs_g: ['Carbs', 'g'], fiber_g: ['Fiber', 'g'], solubleFiber_g: ['Soluble Fiber', 'g'],
+  insolubleFiber_g: ['Insoluble Fiber', 'g'], starch_g: ['Starch', 'g'], sugar_g: ['Sugars', 'g'],
+  saturatedFat_g: ['Saturated Fat', 'g'], monounsaturatedFat_g: ['Monounsaturated Fat', 'g'],
+  polyunsaturatedFat_g: ['Polyunsaturated Fat', 'g'], transFat_g: ['Trans Fat', 'g'],
+  cholesterol_mg: ['Cholesterol', 'mg'], omega3_g: ['Omega-3 (total)', 'g'], ala_mg: ['ALA', 'mg'],
+  epa_mg: ['EPA', 'mg'], dha_mg: ['DHA', 'mg'], omega6_g: ['Omega-6 (total)', 'g'], la_g: ['LA', 'g'],
+  aa_g: ['AA', 'g'], histidine_g: ['Histidine', 'g'], isoleucine_g: ['Isoleucine', 'g'],
+  leucine_g: ['Leucine', 'g'], lysine_g: ['Lysine', 'g'], methionine_g: ['Methionine', 'g'],
+  cystine_g: ['Cystine (Cysteine)', 'g'], phenylalanine_g: ['Phenylalanine', 'g'],
+  tyrosine_g: ['Tyrosine', 'g'], threonine_g: ['Threonine', 'g'], tryptophan_g: ['Tryptophan', 'g'],
+  valine_g: ['Valine', 'g'], arginine_g: ['Arginine', 'g'], alanine_g: ['Alanine', 'g'],
+  asparticAcid_g: ['Aspartic Acid', 'g'], glutamicAcid_g: ['Glutamic Acid', 'g'],
+  glycine_g: ['Glycine', 'g'], proline_g: ['Proline', 'g'], serine_g: ['Serine', 'g'],
+  thiamin_mg: ['Thiamin (B1)', 'mg'], riboflavin_mg: ['Riboflavin (B2)', 'mg'],
+  niacin_mg: ['Niacin (B3)', 'mg'], pantothenicAcid_mg: ['Pantothenic Acid (B5)', 'mg'],
+  vitaminB6_mg: ['Vitamin B6', 'mg'], vitaminB12_ug: ['Vitamin B12', 'mcg'], folate_ug: ['Folate', 'mcg'],
+  biotin_ug: ['Biotin', 'mcg'], choline_mg: ['Choline', 'mg'], vitaminA_ug: ['Vitamin A', 'mcg'],
+  vitaminC_mg: ['Vitamin C', 'mg'], vitaminD_ug: ['Vitamin D', 'mcg'], vitaminE_mg: ['Vitamin E', 'mg'],
+  vitaminK_ug: ['Vitamin K', 'mcg'], calcium_mg: ['Calcium', 'mg'], copper_mg: ['Copper', 'mg'],
+  iron_mg: ['Iron', 'mg'], magnesium_mg: ['Magnesium', 'mg'], manganese_mg: ['Manganese', 'mg'],
+  phosphorus_mg: ['Phosphorus', 'mg'], potassium_mg: ['Potassium', 'mg'], selenium_ug: ['Selenium', 'mcg'],
+  sodium_mg: ['Sodium', 'mg'], zinc_mg: ['Zinc', 'mg'],
+};
+
 function csvEscapeField(value) {
   const s = String(value);
   if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
@@ -1582,7 +1685,6 @@ async function loadFoodsCsv() {
     if (!response.ok) throw new Error('HTTP ' + response.status);
     const text = await response.text();
     FOODS = parseFoodsDatabaseCsv(text);
-    buildFoodIndices();
     init();
   } catch (e) {
     console.error('Could not load foods.csv', e);
@@ -1601,6 +1703,124 @@ function downloadFoodsDatabase() {
     lines.push(row.map(csvEscapeField).join(','));
   });
   triggerDownload('foods.csv', lines.join('\n'), 'text/csv');
+}
+
+
+/* ================================================================
+   SECTION 6b: ADD A CUSTOM FOOD
+   General-purpose - not tied to any category. Nutrients are entered
+   "as labeled" for a given serving size and converted to per-100g at
+   save time, matching how a real nutrition label is usually read.
+   ================================================================ */
+
+// Nutrients being assembled for a not-yet-saved custom food. Scratch
+// space only - not part of `state`, not persisted.
+let draftCustomFoodNutrients = {};
+
+function populateCustomFoodNutrientSelect() {
+  const select = document.getElementById('customFoodNutrientSelect');
+  select.innerHTML = FOOD_CSV_NUTRIENT_COLUMNS
+    .map(key => {
+      const [label, unit] = CUSTOM_FOOD_NUTRIENT_LABELS[key];
+      return `<option value="${key}">${label} (${unit})</option>`;
+    })
+    .join('');
+}
+
+function customFoodDraftListHtml() {
+  const keys = Object.keys(draftCustomFoodNutrients);
+  if (keys.length === 0) return '<div class="empty-note">No nutrients added yet.</div>';
+  return keys.map(key => {
+    const [label, unit] = CUSTOM_FOOD_NUTRIENT_LABELS[key];
+    const amount = draftCustomFoodNutrients[key];
+    return `<span class="draft-nutrient-chip">${label}: ${amount}${unit}
+      <button onclick="removeNutrientFromCustomFoodDraft('${key}')">&times;</button></span>`;
+  }).join('');
+}
+
+function addNutrientToCustomFoodDraft() {
+  const select = document.getElementById('customFoodNutrientSelect');
+  const amountInput = document.getElementById('customFoodNutrientAmount');
+  const key = select.value;
+  const amount = parseFloat(amountInput.value);
+  if (!key || !amount || amount <= 0) return;
+  draftCustomFoodNutrients[key] = amount;
+  amountInput.value = '';
+  document.getElementById('customFoodDraftList').innerHTML = customFoodDraftListHtml();
+}
+
+function removeNutrientFromCustomFoodDraft(key) {
+  delete draftCustomFoodNutrients[key];
+  document.getElementById('customFoodDraftList').innerHTML = customFoodDraftListHtml();
+}
+
+function generateCustomFoodId() {
+  return 900000000 + Math.floor(Math.random() * 99999999);
+}
+
+function saveCustomFood() {
+  const nameInput = document.getElementById('customFoodNameInput');
+  const name = nameInput.value.trim();
+  const servingSize = parseFloat(document.getElementById('customFoodServingSize').value) || 100;
+  if (!name || Object.keys(draftCustomFoodNutrients).length === 0) return;
+
+  // Convert "amount per labeled serving" to "amount per 100g", since
+  // that's the unit every other food in the database uses.
+  const scale = 100 / servingSize;
+  const per100g = {};
+  Object.entries(draftCustomFoodNutrients).forEach(([key, amount]) => {
+    per100g[key] = Math.round(amount * scale * 1000) / 1000;
+  });
+
+  const newFood = { id: generateCustomFoodId(), name, group: 'Custom Foods', per100g };
+  state.customFoods.push(newFood);
+  FOODS.push(newFood);
+  buildFoodIndices();
+
+  draftCustomFoodNutrients = {};
+  nameInput.value = '';
+  document.getElementById('customFoodServingSize').value = 100;
+  document.getElementById('customFoodDraftList').innerHTML = customFoodDraftListHtml();
+
+  saveProfileToStorage();
+  renderCustomFoodsList();
+}
+
+function deleteCustomFood(id) {
+  state.customFoods = state.customFoods.filter(f => f.id !== id);
+  FOODS = FOODS.filter(f => f.id !== id);
+  buildFoodIndices();
+  // Also drop any already-logged entries referencing this food, across
+  // every category, since it no longer exists in the database.
+  BUCKET_KEYS.forEach(bucket => {
+    state.entries[bucket] = state.entries[bucket].filter(entry => entry.foodId !== id);
+  });
+  saveProfileToStorage();
+  saveEntriesToStorage();
+  renderCustomFoodsList();
+  renderFoodGroups();
+  renderNutrientProgress();
+}
+
+function renderCustomFoodsList() {
+  const container = document.getElementById('customFoodsListDisplay');
+  if (state.customFoods.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  const rows = state.customFoods.map(f => `
+    <div class="custom-food-row">
+      <span>${f.name}</span>
+      <button class="remove-btn" onclick="deleteCustomFood(${f.id})" title="Delete this custom food entirely">&times;</button>
+    </div>`).join('');
+  container.innerHTML = `<h4 style="margin-bottom:4px;">Your Custom Foods</h4>${rows}`;
+}
+
+function wireCustomFoodBuilder() {
+  populateCustomFoodNutrientSelect();
+  document.getElementById('btnAddNutrientToCustomFood').addEventListener('click', addNutrientToCustomFoodDraft);
+  document.getElementById('btnSaveCustomFood').addEventListener('click', saveCustomFood);
+  renderCustomFoodsList();
 }
 
 
@@ -1854,6 +2074,11 @@ function wireExportButtons() {
 
 function init() {
   loadProfileFromStorage();
+  // Custom foods you've added live in state.customFoods (persisted), not
+  // in foods.csv - merge them into the working FOODS array so they're
+  // searchable/addable in any category, same as any database food.
+  FOODS = FOODS.concat(state.customFoods);
+  buildFoodIndices();
   loadEntriesFromStorage();
 
   renderProfileForm();
@@ -1865,6 +2090,7 @@ function init() {
   wireExportButtons();
   wireUploadInput();
   document.getElementById('btnDownloadFoodsDb').addEventListener('click', downloadFoodsDatabase);
+  wireCustomFoodBuilder();
   renderFoodGroups();
   renderNutrientProgress();
   setupNutrientTooltips();
