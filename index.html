@@ -139,33 +139,6 @@
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px;
   }
 
-  /* ---------- supplements ---------- */
-  .supplement-add-form {
-    border: 1px dashed var(--line); border-radius: 3px; padding: 12px; margin-top: 10px;
-  }
-  .supplement-add-form input[type="text"] {
-    width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 2px;
-    font-size: 0.9rem; background: #fff; font-family: var(--font-body); margin-bottom: 8px;
-  }
-  .supplement-builder-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-  .supplement-builder-row select {
-    flex: 1; min-width: 140px; padding: 6px; border: 1px solid var(--line); border-radius: 2px;
-    font-family: var(--font-body); font-size: 0.85rem; background: #fff;
-  }
-  .supplement-builder-row input[type="number"] {
-    width: 90px; padding: 6px; border: 1px solid var(--line); border-radius: 2px;
-    font-family: var(--font-mono); background: #fff;
-  }
-  .draft-nutrient-chip {
-    display: inline-flex; align-items: center; gap: 4px; background: var(--paper);
-    border: 1px solid var(--line); border-radius: 20px; padding: 3px 4px 3px 10px;
-    font-size: 0.78rem; margin: 0 6px 6px 0;
-  }
-  .draft-nutrient-chip button {
-    background: none; border: none; color: var(--rust); cursor: pointer; font-size: 0.9rem; padding: 0 4px;
-  }
-  .quick-add-chip-wrap { display: inline-flex; align-items: center; gap: 2px; margin: 0 6px 6px 0; }
-  .quick-add-chip-wrap .remove-btn { font-size: 0.85rem; }
   .food-search-wrap {
     position: relative;
     z-index: 1;
@@ -425,7 +398,6 @@
         <h2 style="border:none;margin-bottom:0;padding-bottom:0;">Your Foods (grams/day)</h2>
         <button class="chip" id="btnResetFoods" style="margin-top:-14px;">Reset all foods</button>
       </div>
-      <div class="food-group" id="supplementsGroup"></div>
       <div id="foodGroups"></div>
     </div>
 
@@ -458,10 +430,8 @@
   <div class="panel">
     <h2>Load a Previous Download</h2>
     <p style="color:var(--ink-soft); font-size:0.88rem; margin-top:-6px;">
-      Upload a JSON or CSV file you downloaded earlier to restore that food list. JSON restores everything
-      exactly (including supplements); CSV works too, but supplement amounts have to be reconstructed from the
-      summary text in the file, so it's a slightly less exact round-trip. This <strong>replaces</strong> what's
-      currently logged - it doesn't merge with it.
+      Upload a JSON or CSV file you downloaded earlier to restore that food list exactly - both formats work
+      equally well. This <strong>replaces</strong> what's currently logged - it doesn't merge with it.
     </p>
     <input type="file" id="inputUploadFile" accept=".json,.csv" style="margin-top:6px;">
   </div>
@@ -529,10 +499,11 @@ const CALORIES_PER_GRAM = { protein: 4, fat: 9, carbs: 4 };
 // mapping here anymore. BUCKET_KEYS below is just the fixed list of
 // section slots the UI has (their default names live in BUCKET_LABELS,
 // freely renamable via getBucketLabel()/setBucketLabel()).
-const BUCKET_KEYS = ['vegetables', 'fruits', 'legumes', 'grains', 'nutsSeeds',
+const BUCKET_KEYS = ['supplements', 'vegetables', 'fruits', 'legumes', 'grains', 'nutsSeeds',
   'fatsOils', 'bakedGoods', 'sweetsSnacks', 'beverages', 'spicesHerbs',
   'dairyEggs', 'meatPoultry', 'seafood', 'soupsSauces', 'mixedDishes'];
 const BUCKET_LABELS = {
+  supplements: 'Supplements',
   vegetables: 'Vegetables', fruits: 'Fruits & Fruit Juices', legumes: 'Legumes',
   grains: 'Grains & Cereal', nutsSeeds: 'Nuts & Seeds', fatsOils: 'Fats & Oils',
   bakedGoods: 'Baked Goods', sweetsSnacks: 'Sweets & Snacks', beverages: 'Beverages',
@@ -692,71 +663,6 @@ function buildFoodIndices() {
   FOODS.forEach(f => { FOODS_BY_ID[f.id] = f; });
 }
 
-// ---- Supplements ----
-// Unlike food-group items, supplements aren't looked up in a database -
-// you define each one yourself (name + nutrient amounts per serving), so
-// this is just the menu of nutrients you're allowed to enter per serving,
-// covering everything the app actually tracks a bar for.
-const SUPPLEMENT_NUTRIENT_OPTIONS = [
-  ['calories_kcal', 'Calories', 'kcal'],
-  ['protein_g', 'Protein', 'g'],
-  ['fat_g', 'Fat', 'g'],
-  ['saturatedFat_g', 'Saturated Fat', 'g'],
-  ['monounsaturatedFat_g', 'Monounsaturated Fat', 'g'],
-  ['polyunsaturatedFat_g', 'Polyunsaturated Fat', 'g'],
-  ['transFat_g', 'Trans Fat', 'g'],
-  ['cholesterol_mg', 'Cholesterol', 'mg'],
-  ['omega3_g', 'Omega-3 (total)', 'g'],
-  ['ala_mg', 'ALA', 'mg'],
-  ['epa_mg', 'EPA', 'mg'],
-  ['dha_mg', 'DHA', 'mg'],
-  ['omega6_g', 'Omega-6 (total)', 'g'],
-  ['la_g', 'LA', 'g'],
-  ['aa_g', 'AA', 'g'],
-  ['carbs_g', 'Carbs', 'g'],
-  ['fiber_g', 'Fiber', 'g'],
-  ['thiamin_mg', 'Thiamin (B1)', 'mg'],
-  ['riboflavin_mg', 'Riboflavin (B2)', 'mg'],
-  ['niacin_mg', 'Niacin (B3)', 'mg'],
-  ['histidine_g', 'Histidine', 'g'],
-  ['isoleucine_g', 'Isoleucine', 'g'],
-  ['leucine_g', 'Leucine', 'g'],
-  ['lysine_g', 'Lysine', 'g'],
-  ['methionine_g', 'Methionine', 'g'],
-  ['cystine_g', 'Cystine (Cysteine)', 'g'],
-  ['phenylalanine_g', 'Phenylalanine', 'g'],
-  ['tyrosine_g', 'Tyrosine', 'g'],
-  ['threonine_g', 'Threonine', 'g'],
-  ['tryptophan_g', 'Tryptophan', 'g'],
-  ['valine_g', 'Valine', 'g'],
-  ['calcium_mg', 'Calcium', 'mg'],
-  ['iron_mg', 'Iron', 'mg'],
-  ['magnesium_mg', 'Magnesium', 'mg'],
-  ['phosphorus_mg', 'Phosphorus', 'mg'],
-  ['potassium_mg', 'Potassium', 'mg'],
-  ['sodium_mg', 'Sodium', 'mg'],
-  ['zinc_mg', 'Zinc', 'mg'],
-  ['copper_mg', 'Copper', 'mg'],
-  ['manganese_mg', 'Manganese', 'mg'],
-  ['selenium_ug', 'Selenium', 'mcg'],
-  ['vitaminA_ug', 'Vitamin A', 'mcg'],
-  ['vitaminC_mg', 'Vitamin C', 'mg'],
-  ['vitaminD_ug', 'Vitamin D', 'mcg'],
-  ['vitaminE_mg', 'Vitamin E', 'mg'],
-  ['vitaminK_ug', 'Vitamin K', 'mcg'],
-  ['folate_ug', 'Folate', 'mcg'],
-  ['vitaminB6_mg', 'Vitamin B6', 'mg'],
-  ['vitaminB12_ug', 'Vitamin B12', 'mcg'],
-  ['biotin_ug', 'Biotin', 'mcg'],
-  ['pantothenicAcid_mg', 'Pantothenic Acid (B5)', 'mg'],
-  ['choline_mg', 'Choline', 'mg'],
-];
-const SUPPLEMENT_NUTRIENT_LABEL = {};
-const SUPPLEMENT_NUTRIENT_UNIT = {};
-SUPPLEMENT_NUTRIENT_OPTIONS.forEach(([key, label, unit]) => {
-  SUPPLEMENT_NUTRIENT_LABEL[key] = label;
-  SUPPLEMENT_NUTRIENT_UNIT[key] = unit;
-});
 
 
 /* ================================================================
@@ -796,10 +702,6 @@ let state = {
   // once you've actually renamed one - anything not in this object just
   // falls back to its default label via getBucketLabel() below.
   bucketLabels: {},
-  // Your personal supplement "cabinet" - each one defined once (name +
-  // nutrient amounts per serving), then referenced by id from the daily
-  // log below so you don't have to re-enter B12's dose every day.
-  supplementLibrary: [],
   // Multiplies every target in the nutrient panel by this many days -
   // 1 is a normal daily view, higher values turn the targets into a
   // shopping-list total for planning multiple days at once.
@@ -807,13 +709,10 @@ let state = {
   entries: {}
 };
 BUCKET_KEYS.forEach(b => state.entries[b] = []);
-state.entries.supplements = []; // [{ supplementId, servings }, ...] - not a food-database bucket
 state.entries.notes = ''; // free text saved to the bottom of exported files
 
-// Nutrients being assembled for a NOT-YET-SAVED supplement in the add
-// form. Intentionally not part of `state`/not persisted - it's just
-// scratch space while you're building one entry.
-let draftSupplementNutrients = {};
+
+
 
 function todayString() {
   const d = new Date();
@@ -831,7 +730,7 @@ const ENTRIES_STORAGE_KEY = 'veganTracker_entries';
 function saveProfileToStorage() {
   localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify({
     profile: state.profile, targets: state.targets, label: state.label,
-    hiddenBuckets: state.hiddenBuckets, supplementLibrary: state.supplementLibrary,
+    hiddenBuckets: state.hiddenBuckets,
     bucketLabels: state.bucketLabels,
     dayMultiplier: state.dayMultiplier
   }));
@@ -845,7 +744,6 @@ function loadProfileFromStorage() {
     if (parsed.targets) state.targets = parsed.targets;
     if (typeof parsed.label === 'string') state.label = parsed.label;
     if (Array.isArray(parsed.hiddenBuckets)) state.hiddenBuckets = parsed.hiddenBuckets;
-    if (Array.isArray(parsed.supplementLibrary)) state.supplementLibrary = parsed.supplementLibrary;
     if (parsed.bucketLabels && typeof parsed.bucketLabels === 'object') state.bucketLabels = parsed.bucketLabels;
     if (typeof parsed.dayMultiplier === 'number') state.dayMultiplier = parsed.dayMultiplier;
   } catch (e) { console.error('Could not read saved profile', e); }
@@ -881,7 +779,6 @@ function loadEntriesFromStorage() {
   try {
     const parsed = JSON.parse(raw);
     BUCKET_KEYS.forEach(b => { state.entries[b] = parsed[b] || []; });
-    state.entries.supplements = parsed.supplements || [];
     state.entries.notes = parsed.notes || '';
   } catch (e) { console.error('Could not read saved food log', e); }
 }
@@ -988,13 +885,6 @@ function computeDailyTotals() {
       });
     });
   });
-  state.entries.supplements.forEach(entry => {
-    const supp = state.supplementLibrary.find(s => s.id === entry.supplementId);
-    if (!supp) return;
-    Object.entries(supp.nutrients).forEach(([nutrientKey, amountPerServing]) => {
-      totals[nutrientKey] = (totals[nutrientKey] || 0) + amountPerServing * entry.servings;
-    });
-  });
   // Net Carbs isn't a raw USDA field - it's carbs minus fiber, computed
   // once here so the gauge bar can read it like any other nutrient.
   totals.netCarbs_g = (totals.carbs_g || 0) - (totals.fiber_g || 0);
@@ -1038,13 +928,6 @@ function nutrientContributionBreakdown(keys) {
       if (amount <= 0) return;
       contributions[food.name] = (contributions[food.name] || 0) + amount;
     });
-  });
-  state.entries.supplements.forEach(entry => {
-    const supp = state.supplementLibrary.find(s => s.id === entry.supplementId);
-    if (!supp) return;
-    const amount = amountForKeys(supp.nutrients, keys) * entry.servings;
-    if (amount <= 0) return;
-    contributions[supp.name] = (contributions[supp.name] || 0) + amount;
   });
   const total = Object.values(contributions).reduce((a, b) => a + b, 0);
   return Object.entries(contributions)
@@ -1469,162 +1352,6 @@ function buildFoodRowHtml(bucket, entry, idx) {
     </div>`;
 }
 
-// ---- Supplements ----
-// Not database-backed like the food groups above - each supplement is
-// defined once (name + nutrient amounts per serving) into a personal
-// "library", then logged day to day by referencing that definition so
-// you don't have to re-enter B12's dose every time you take it.
-
-function generateSupplementId() {
-  return 'supp_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
-}
-
-function renderSupplementsSection() {
-  const container = document.getElementById('supplementsGroup');
-  const entries = state.entries.supplements;
-  const rowsHtml = entries.length === 0
-    ? '<div class="empty-note">No supplements logged yet.</div>'
-    : entries.map((entry, idx) => buildSupplementRowHtml(entry, idx)).join('');
-
-  const optionsHtml = SUPPLEMENT_NUTRIENT_OPTIONS
-    .map(([key, label, unit]) => `<option value="${key}">${label} (${unit})</option>`)
-    .join('');
-
-  container.innerHTML = `
-    <h3><span>Supplements</span></h3>
-    ${buildQuickAddChipsHtml()}
-    <div id="supplementRows">${rowsHtml}</div>
-    <div class="supplement-add-form">
-      <input type="text" id="supplementNameInput" placeholder="New supplement name (e.g. Vitamin B12, Pea Protein Powder)">
-      <div class="supplement-builder-row">
-        <select id="supplementNutrientSelect">${optionsHtml}</select>
-        <input type="number" id="supplementNutrientAmount" placeholder="Amount per serving" step="any">
-        <button class="chip" id="btnAddNutrientToDraft">+ Add nutrient</button>
-      </div>
-      <div id="draftNutrientList">${draftNutrientListHtml()}</div>
-      <button class="chip" id="btnSaveSupplement">Save Supplement</button>
-    </div>`;
-
-  document.getElementById('btnAddNutrientToDraft').addEventListener('click', addNutrientToDraft);
-  document.getElementById('btnSaveSupplement').addEventListener('click', saveDraftSupplement);
-}
-
-function buildQuickAddChipsHtml() {
-  if (state.supplementLibrary.length === 0) return '';
-  const chips = state.supplementLibrary.map(s => `
-    <span class="quick-add-chip-wrap">
-      <button class="chip" onclick="quickAddSupplement('${s.id}')">+ ${s.name}</button>
-      <button class="remove-btn" onclick="deleteSupplementFromLibrary('${s.id}')" title="Delete this supplement definition entirely">&times;</button>
-    </span>`).join('');
-  return `<div class="hidden-categories-row"><span style="color:var(--ink-soft);font-size:12px;">Quick add:</span>${chips}</div>`;
-}
-
-function buildSupplementRowHtml(entry, idx) {
-  const supp = state.supplementLibrary.find(s => s.id === entry.supplementId);
-  if (!supp) return '';
-  const summary = Object.entries(supp.nutrients)
-    .map(([k, v]) => `${SUPPLEMENT_NUTRIENT_LABEL[k]} ${fmt(v * entry.servings)}${SUPPLEMENT_NUTRIENT_UNIT[k]}`)
-    .join(', ');
-  return `
-    <div class="food-row">
-      <span class="fname">${supp.name}<br><span style="font-size:10.5px;color:var(--ink-soft);">${summary}</span></span>
-      <div class="gram-control">
-        <button onclick="adjustSupplementServings(${idx}, -1)">-</button>
-        <input type="number" value="${entry.servings}" min="0" step="1"
-               onchange="setSupplementServings(${idx}, this.value)">
-        <button onclick="adjustSupplementServings(${idx}, 1)">+</button>
-      </div>
-      <span class="fkcal">${entry.servings} serving${entry.servings === 1 ? '' : 's'}</span>
-      <button class="remove-btn" onclick="removeSupplement(${idx})">&times;</button>
-    </div>`;
-}
-
-// Only re-renders the draft nutrient chip list (not the whole section),
-// so the name you've already typed doesn't get wiped out while you're
-// still adding nutrients to the same draft.
-function draftNutrientListHtml() {
-  const keys = Object.keys(draftSupplementNutrients);
-  if (keys.length === 0) return '<div class="empty-note">No nutrients added yet.</div>';
-  return keys.map(key => {
-    const amount = draftSupplementNutrients[key];
-    return `<span class="draft-nutrient-chip">${SUPPLEMENT_NUTRIENT_LABEL[key]}: ${amount}${SUPPLEMENT_NUTRIENT_UNIT[key]}
-      <button onclick="removeNutrientFromDraft('${key}')">&times;</button></span>`;
-  }).join('');
-}
-
-function addNutrientToDraft() {
-  const select = document.getElementById('supplementNutrientSelect');
-  const amountInput = document.getElementById('supplementNutrientAmount');
-  const key = select.value;
-  const amount = parseFloat(amountInput.value);
-  if (!key || !amount || amount <= 0) return;
-  draftSupplementNutrients[key] = amount;
-  amountInput.value = '';
-  document.getElementById('draftNutrientList').innerHTML = draftNutrientListHtml();
-}
-
-function removeNutrientFromDraft(key) {
-  delete draftSupplementNutrients[key];
-  document.getElementById('draftNutrientList').innerHTML = draftNutrientListHtml();
-}
-
-function saveDraftSupplement() {
-  const nameInput = document.getElementById('supplementNameInput');
-  const name = nameInput.value.trim();
-  if (!name || Object.keys(draftSupplementNutrients).length === 0) return;
-
-  const newSupp = { id: generateSupplementId(), name, nutrients: { ...draftSupplementNutrients } };
-  state.supplementLibrary.push(newSupp);
-  // Saving it also logs one serving today, since you're presumably
-  // adding it because you're taking it right now.
-  state.entries.supplements.push({ supplementId: newSupp.id, servings: 1 });
-
-  draftSupplementNutrients = {};
-  saveProfileToStorage();
-  saveEntriesToStorage();
-  renderSupplementsSection();
-  renderNutrientProgress();
-}
-
-function quickAddSupplement(supplementId) {
-  state.entries.supplements.push({ supplementId, servings: 1 });
-  saveEntriesToStorage();
-  renderSupplementsSection();
-  renderNutrientProgress();
-}
-
-function deleteSupplementFromLibrary(id) {
-  state.supplementLibrary = state.supplementLibrary.filter(s => s.id !== id);
-  state.entries.supplements = state.entries.supplements.filter(e => e.supplementId !== id);
-  saveProfileToStorage();
-  saveEntriesToStorage();
-  renderSupplementsSection();
-  renderNutrientProgress();
-}
-
-function adjustSupplementServings(idx, delta) {
-  const entry = state.entries.supplements[idx];
-  entry.servings = Math.max(0, entry.servings + delta);
-  saveEntriesToStorage();
-  renderSupplementsSection();
-  renderNutrientProgress();
-}
-
-function setSupplementServings(idx, value) {
-  const servings = Math.max(0, parseFloat(value) || 0);
-  state.entries.supplements[idx].servings = servings;
-  saveEntriesToStorage();
-  renderSupplementsSection();
-  renderNutrientProgress();
-}
-
-function removeSupplement(idx) {
-  state.entries.supplements.splice(idx, 1);
-  saveEntriesToStorage();
-  renderSupplementsSection();
-  renderNutrientProgress();
-}
-
 function onFoodSearchInput(bucket) {
   const input = document.getElementById('search-' + bucket);
   const wrap = input.closest('.food-search-wrap');
@@ -1696,14 +1423,6 @@ function buildExportData() {
       };
     });
   });
-  const supplementsExpanded = state.entries.supplements.map(entry => {
-    const supp = state.supplementLibrary.find(s => s.id === entry.supplementId);
-    return {
-      name: supp ? supp.name : 'Unknown supplement',
-      servings: entry.servings,
-      nutrients: supp ? supp.nutrients : {}
-    };
-  });
   // Category display names at the time of export - "foods" below is
   // still keyed by the stable internal bucket id (so re-importing this
   // file works reliably even if you rename things later), but this map
@@ -1719,7 +1438,6 @@ function buildExportData() {
     totals: computeDailyTotals(),
     categoryLabels: categoryLabels,
     foods: entriesExpanded,
-    supplements: supplementsExpanded,
     notes: state.entries.notes
   };
 }
@@ -1736,12 +1454,6 @@ function exportCsv() {
       lines.push(`${getBucketLabel(bucket)},"${item.name}",${item.grams},${item.calories}`);
     });
   });
-  data.supplements.forEach(item => {
-    const nutrientSummary = Object.entries(item.nutrients)
-      .map(([k, v]) => `${SUPPLEMENT_NUTRIENT_LABEL[k]} ${fmt(v * item.servings)}${SUPPLEMENT_NUTRIENT_UNIT[k]}`)
-      .join('; ');
-    lines.push(`Supplements,"${item.name}",${item.servings} serving(s),"${nutrientSummary}"`);
-  });
   if (data.notes && data.notes.trim() !== '') {
     lines.push('');
     lines.push('Notes');
@@ -1754,18 +1466,6 @@ function exportText() {
   const data = buildExportData();
   let out = `Nutrition Tracker - ${data.label || data.exportedOn}\n`;
   out += '='.repeat(40) + '\n\n';
-  out += 'Supplements:\n';
-  if (data.supplements.length === 0) {
-    out += '  (none logged)\n';
-  } else {
-    data.supplements.forEach(item => {
-      const nutrientSummary = Object.entries(item.nutrients)
-        .map(([k, v]) => `${SUPPLEMENT_NUTRIENT_LABEL[k]} ${fmt(v * item.servings)}${SUPPLEMENT_NUTRIENT_UNIT[k]}`)
-        .join(', ');
-      out += `  - ${item.name}: ${item.servings} serving(s) (${nutrientSummary})\n`;
-    });
-  }
-  out += '\n';
   BUCKET_KEYS.forEach(bucket => {
     out += getBucketLabel(bucket) + ':\n';
     if (data.foods[bucket].length === 0) {
@@ -1945,7 +1645,7 @@ function parseCsv(text) {
 }
 
 // Both parsers below return the same shape:
-// { newEntries: {bucketKey: [{foodId,grams}]}, newSupplements: [{name,servings,nutrients}], notes, unmatched: [string] }
+// { newEntries: {bucketKey: [{foodId,grams}]}, notes, unmatched: [string] }
 
 function parseImportFromJson(text) {
   const data = JSON.parse(text);
@@ -1961,18 +1661,13 @@ function parseImportFromJson(text) {
     });
   });
 
-  const newSupplements = (data.supplements || []).map(s => ({
-    name: s.name, servings: s.servings, nutrients: s.nutrients || {}
-  }));
-
-  return { newEntries, newSupplements, notes: data.notes || '', unmatched };
+  return { newEntries, notes: data.notes || '', unmatched };
 }
 
 function parseImportFromCsv(text) {
   const rows = parseCsv(text);
   const newEntries = {};
   BUCKET_KEYS.forEach(b => newEntries[b] = []);
-  const newSupplements = [];
   const unmatched = [];
 
   const labelToBucket = {};
@@ -1980,8 +1675,6 @@ function parseImportFromCsv(text) {
     labelToBucket[BUCKET_LABELS[b]] = b;   // the original default name still matches
     labelToBucket[getBucketLabel(b)] = b;  // ...as does whatever it's currently renamed to
   });
-  const labelToNutrientKey = {};
-  SUPPLEMENT_NUTRIENT_OPTIONS.forEach(([key, label]) => { labelToNutrientKey[label] = key; });
 
   let inNotesSection = false;
   let notes = '';
@@ -1992,32 +1685,7 @@ function parseImportFromCsv(text) {
     if (inNotesSection) { notes = fields[0] || ''; return; }
     if (fields.length < 3 || !fields[0]) return; // skip blank/malformed rows
 
-    const [groupLabel, name, thirdField, fourthField] = fields;
-
-    if (groupLabel === 'Supplements') {
-      // thirdField looks like "2 serving(s)"; fourthField looks like
-      // "Vitamin B12 25mcg" or "Protein 24g; Calories 110kcal" - both are
-      // TOTALS (amount * servings), so we divide back out by servings to
-      // recover the per-serving amount the app actually needs.
-      const servingsMatch = /^([\d.]+)/.exec(thirdField || '');
-      const servings = servingsMatch ? parseFloat(servingsMatch[1]) : 1;
-      const nutrients = {};
-      (fourthField || '').split(';').forEach(piece => {
-        const m = /^\s*(.+?)\s+([\d.]+)(mcg|mg|kcal|g)\s*$/.exec(piece);
-        if (!m) return;
-        const label = m[1].trim();
-        const totalAmount = parseFloat(m[2]);
-        const key = labelToNutrientKey[label];
-        if (!key || servings <= 0) return;
-        nutrients[key] = totalAmount / servings;
-      });
-      if (Object.keys(nutrients).length > 0) {
-        newSupplements.push({ name, servings, nutrients });
-      } else {
-        unmatched.push(`Supplement "${name}" (couldn't parse its nutrient amounts)`);
-      }
-      return;
-    }
+    const [groupLabel, name, thirdField] = fields;
 
     const bucket = labelToBucket[groupLabel];
     const grams = parseFloat(thirdField);
@@ -2029,36 +1697,24 @@ function parseImportFromCsv(text) {
     newEntries[bucket].push({ foodId: food.id, grams });
   });
 
-  return { newEntries, newSupplements, notes, unmatched };
+  return { newEntries, notes, unmatched };
 }
 
-// Replaces the current food/supplement log with an imported one. Matches
-// supplements to your existing library by name where possible, and
-// creates a new library entry for any that aren't already saved.
+// Replaces the current food log with an imported one - supplements are
+// now just another category, so this handles them the same way as
+// every other bucket (no separate library-matching step needed anymore).
 function applyImportResult(result) {
   BUCKET_KEYS.forEach(b => { state.entries[b] = result.newEntries[b] || []; });
-
-  state.entries.supplements = [];
-  result.newSupplements.forEach(supp => {
-    let libEntry = state.supplementLibrary.find(s => s.name.toLowerCase() === supp.name.toLowerCase());
-    if (!libEntry) {
-      libEntry = { id: generateSupplementId(), name: supp.name, nutrients: supp.nutrients };
-      state.supplementLibrary.push(libEntry);
-    }
-    state.entries.supplements.push({ supplementId: libEntry.id, servings: supp.servings });
-  });
-
   state.entries.notes = result.notes;
 
   saveProfileToStorage();
   saveEntriesToStorage();
   renderFoodGroups();
-  renderSupplementsSection();
   renderNutrientProgress();
   document.getElementById('inputNotes').value = state.entries.notes;
 
   const totalFoods = BUCKET_KEYS.reduce((sum, b) => sum + state.entries[b].length, 0);
-  let message = `Imported ${totalFoods} food item(s) and ${result.newSupplements.length} supplement(s).`;
+  let message = `Imported ${totalFoods} food item(s).`;
   if (result.unmatched.length > 0) {
     message += `\n\n${result.unmatched.length} item(s) couldn't be matched and were skipped:\n` +
       result.unmatched.slice(0, 15).join('\n') +
@@ -2173,17 +1829,16 @@ function setDayMultiplier(value) {
 }
 
 // ---- Full reset ----
-// Clears every food-group entry AND the supplement log (but keeps your
-// supplement library definitions, hidden-category choices, and profile
-// targets intact - only the "what did I log" data goes away).
+// Clears every category's logged entries (including Supplements, which
+// is just a normal category now) but keeps your hidden-category choices,
+// renamed labels, and profile targets intact - only the "what did I log
+// today" data goes away.
 function resetAllFoods() {
   const confirmed = confirm('Clear every food and supplement logged? This can\'t be undone.');
   if (!confirmed) return;
   BUCKET_KEYS.forEach(b => { state.entries[b] = []; });
-  state.entries.supplements = [];
   saveEntriesToStorage();
   renderFoodGroups();
-  renderSupplementsSection();
   renderNutrientProgress();
 }
 
@@ -2210,7 +1865,6 @@ function init() {
   wireExportButtons();
   wireUploadInput();
   document.getElementById('btnDownloadFoodsDb').addEventListener('click', downloadFoodsDatabase);
-  renderSupplementsSection();
   renderFoodGroups();
   renderNutrientProgress();
   setupNutrientTooltips();
