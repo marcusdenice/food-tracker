@@ -207,6 +207,10 @@
     font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-soft);
     margin: 18px 0 6px;
   }
+  .sub-heading {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--ink-soft);
+    margin: 12px 0 4px; opacity: 0.8;
+  }
   .nrow { margin: 7px 0; }
   .nrow .nline { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 3px; }
   .nrow .nline .amt { font-family: var(--font-mono); color: var(--ink-soft); }
@@ -522,6 +526,10 @@
   potassium/phosphorus intake needs individual attention. Iodine isn't tracked here. B12 and vitamin D are tracked,
   but vegan whole foods rarely provide them naturally, so keep an eye on those two bars and talk to a doctor about
   supplementing if they stay low.
+  <br><br>
+  *Methionine/Cystine and Phenylalanine/Tyrosine are officially scored by WHO/FAO as combined pairs, not
+  individually - each amino acid in a pair is shown against that same shared target as a simplification, rather
+  than two independently-derived numbers.
 </footer>
 
 <!-- Shared tooltip element - one div, repositioned and refilled on hover
@@ -1320,7 +1328,13 @@ function renderNutrientProgress() {
     gaugeRow('calories_kcal', 'Calories', totals.calories_kcal || 0, effectiveKcal, 'kcal', {});
   document.getElementById('carbBars').innerHTML = CARB_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
   document.getElementById('lipidBars').innerHTML = LIPID_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
-  document.getElementById('proteinBars').innerHTML = PROTEIN_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
+  // "Protein" itself renders first, then a sub-heading before the 11
+  // individual amino acids (the * points to the footnote about
+  // methionine/cystine and phenylalanine/tyrosine sharing one target).
+  const proteinRowHtml = renderNutrientRow(PROTEIN_ROWS[0], ctx);
+  const aminoRowsHtml = PROTEIN_ROWS.slice(1).map(r => renderNutrientRow(r, ctx)).join('');
+  document.getElementById('proteinBars').innerHTML =
+    proteinRowHtml + '<div class="sub-heading">Essential Amino Acids*</div>' + aminoRowsHtml;
   document.getElementById('vitaminBars').innerHTML = VITAMIN_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
   document.getElementById('mineralBars').innerHTML = MINERAL_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
 }
