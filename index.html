@@ -207,10 +207,6 @@
     font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-soft);
     margin: 18px 0 6px;
   }
-  .sub-heading {
-    font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--ink-soft);
-    margin: 12px 0 4px; opacity: 0.8;
-  }
   .nrow { margin: 7px 0; }
   .nrow .nline { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 3px; }
   .nrow .nline .amt { font-family: var(--font-mono); color: var(--ink-soft); }
@@ -527,7 +523,10 @@
   but vegan whole foods rarely provide them naturally, so keep an eye on those two bars and talk to a doctor about
   supplementing if they stay low.
   <br><br>
-  *Methionine/Cystine and Phenylalanine/Tyrosine are officially scored by WHO/FAO as combined pairs, not
+  *Marks the 9 essential amino acids - ones your body can't make on its own, so they have to come from food.
+  Cystine and Tyrosine are "conditionally essential" instead (the body can make them from Methionine and
+  Phenylalanine respectively, given enough of those), which is why they're unmarked. Also worth knowing:
+  Methionine/Cystine and Phenylalanine/Tyrosine are officially scored by WHO/FAO as combined pairs, not
   individually - each amino acid in a pair is shown against that same shared target as a simplification, rather
   than two independently-derived numbers.
 </footer>
@@ -683,16 +682,16 @@ const LIPID_ROWS = [
 const PROTEIN_ROWS = [
   { key: 'protein_g', label: 'Protein', unit: 'g', kind: 'macro' },
   { key: 'cystine_g', label: 'Cystine', unit: 'g', kind: 'proteinScaled' },
-  { key: 'histidine_g', label: 'Histidine', unit: 'g', kind: 'proteinScaled' },
-  { key: 'isoleucine_g', label: 'Isoleucine', unit: 'g', kind: 'proteinScaled' },
-  { key: 'leucine_g', label: 'Leucine', unit: 'g', kind: 'proteinScaled' },
-  { key: 'lysine_g', label: 'Lysine', unit: 'g', kind: 'proteinScaled' },
-  { key: 'methionine_g', label: 'Methionine', unit: 'g', kind: 'proteinScaled' },
-  { key: 'phenylalanine_g', label: 'Phenylalanine', unit: 'g', kind: 'proteinScaled' },
-  { key: 'threonine_g', label: 'Threonine', unit: 'g', kind: 'proteinScaled' },
-  { key: 'tryptophan_g', label: 'Tryptophan', unit: 'g', kind: 'proteinScaled' },
+  { key: 'histidine_g', label: 'Histidine*', unit: 'g', kind: 'proteinScaled' },
+  { key: 'isoleucine_g', label: 'Isoleucine*', unit: 'g', kind: 'proteinScaled' },
+  { key: 'leucine_g', label: 'Leucine*', unit: 'g', kind: 'proteinScaled' },
+  { key: 'lysine_g', label: 'Lysine*', unit: 'g', kind: 'proteinScaled' },
+  { key: 'methionine_g', label: 'Methionine*', unit: 'g', kind: 'proteinScaled' },
+  { key: 'phenylalanine_g', label: 'Phenylalanine*', unit: 'g', kind: 'proteinScaled' },
+  { key: 'threonine_g', label: 'Threonine*', unit: 'g', kind: 'proteinScaled' },
+  { key: 'tryptophan_g', label: 'Tryptophan*', unit: 'g', kind: 'proteinScaled' },
   { key: 'tyrosine_g', label: 'Tyrosine', unit: 'g', kind: 'proteinScaled' },
-  { key: 'valine_g', label: 'Valine', unit: 'g', kind: 'proteinScaled' },
+  { key: 'valine_g', label: 'Valine*', unit: 'g', kind: 'proteinScaled' },
 ];
 const VITAMIN_ROWS = [
   { key: 'thiamin_mg', label: 'B1 (Thiamine)', unit: 'mg', kind: 'calorieLinked' },
@@ -1328,13 +1327,7 @@ function renderNutrientProgress() {
     gaugeRow('calories_kcal', 'Calories', totals.calories_kcal || 0, effectiveKcal, 'kcal', {});
   document.getElementById('carbBars').innerHTML = CARB_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
   document.getElementById('lipidBars').innerHTML = LIPID_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
-  // "Protein" itself renders first, then a sub-heading before the 11
-  // individual amino acids (the * points to the footnote about
-  // methionine/cystine and phenylalanine/tyrosine sharing one target).
-  const proteinRowHtml = renderNutrientRow(PROTEIN_ROWS[0], ctx);
-  const aminoRowsHtml = PROTEIN_ROWS.slice(1).map(r => renderNutrientRow(r, ctx)).join('');
-  document.getElementById('proteinBars').innerHTML =
-    proteinRowHtml + '<div class="sub-heading">Essential Amino Acids*</div>' + aminoRowsHtml;
+document.getElementById('proteinBars').innerHTML = PROTEIN_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
   document.getElementById('vitaminBars').innerHTML = VITAMIN_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
   document.getElementById('mineralBars').innerHTML = MINERAL_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
 }
