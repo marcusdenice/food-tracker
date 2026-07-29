@@ -1308,9 +1308,16 @@ function renderSliders() {
   document.getElementById('fatPctValue').textContent = s.fatPct + '%';
   document.getElementById('carbsPctValue').textContent = s.carbsPct + '%';
 
-  document.getElementById('proteinGramsInfo').textContent = `${s.protein_g} g \u00b7 ${s.protein_g * CALORIES_PER_GRAM.protein} kcal`;
-  document.getElementById('fatGramsInfo').textContent = `${s.fat_g} g \u00b7 ${s.fat_g * CALORIES_PER_GRAM.fat} kcal`;
-  document.getElementById('carbsGramsInfo').textContent = `${s.carbs_g} g \u00b7 ${s.carbs_g * CALORIES_PER_GRAM.carbs} kcal`;
+  // g/kg body weight is the standard way protein needs are usually
+  // discussed (e.g. "1.0-1.2 g/kg for older adults") - shown here for
+  // all three macros for consistency, even though that framing is most
+  // commonly used for protein specifically.
+  const weightKgForDisplay = lbsToKg(state.profile.weightLbs);
+  const perKg = grams => weightKgForDisplay > 0 ? (grams / weightKgForDisplay).toFixed(2) : '0.00';
+
+  document.getElementById('proteinGramsInfo').textContent = `${s.protein_g} g \u00b7 ${s.protein_g * CALORIES_PER_GRAM.protein} kcal \u00b7 ${perKg(s.protein_g)} g/kg`;
+  document.getElementById('fatGramsInfo').textContent = `${s.fat_g} g \u00b7 ${s.fat_g * CALORIES_PER_GRAM.fat} kcal \u00b7 ${perKg(s.fat_g)} g/kg`;
+  document.getElementById('carbsGramsInfo').textContent = `${s.carbs_g} g \u00b7 ${s.carbs_g * CALORIES_PER_GRAM.carbs} kcal \u00b7 ${perKg(s.carbs_g)} g/kg`;
 
   document.getElementById('macroPctSum').textContent = s.proteinPct + s.fatPct + s.carbsPct;
 }
@@ -2153,6 +2160,7 @@ function wireProfileControls() {
   document.getElementById('inputWeight').addEventListener('change', e => {
     state.profile.weightLbs = parseFloat(e.target.value) || 0;
     saveProfileToStorage();
+    renderSliders(); // g/kg display depends on weight
   });
   document.getElementById('inputHeight').addEventListener('change', e => {
     state.profile.heightIn = parseFloat(e.target.value) || 0;
