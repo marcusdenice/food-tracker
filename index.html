@@ -210,12 +210,29 @@
   .nrow { margin: 7px 0; }
   .nrow .nline { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 3px; }
   .nrow .nline .amt { font-family: var(--font-mono); color: var(--ink-soft); }
+  .target-input {
+    font: inherit; font-family: var(--font-mono); color: inherit; background: transparent;
+    border: none; border-bottom: 1px dashed transparent; padding: 0; width: 52px; text-align: right;
+  }
+  .target-input:hover { border-bottom-color: var(--line); }
+  .target-input:focus {
+    outline: none; border-bottom: 1px solid var(--moss); background: var(--paper-raised); color: var(--ink);
+  }
+  .reset-target-btn {
+    background: none; border: none; color: var(--moss); cursor: pointer; font-size: 0.85rem;
+    padding: 0 0 0 3px; vertical-align: middle;
+  }
+  .reset-target-btn:hover { color: var(--rust); }
   .gauge {
     height: 8px; background: #E7E4D4; border-radius: 4px; position: relative; overflow: hidden;
     border: 1px solid var(--line);
   }
   .gauge .fill { height: 100%; border-radius: 4px 0 0 4px; transition: width 0.15s ease; }
   .gauge .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ink); opacity: 0.4; }
+  .gauge .activity-tick {
+    position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--mustard);
+    opacity: 0.85; border-radius: 1px;
+  }
   .fill.low { background: var(--red-low); }
   .fill.mid { background: var(--amber-warn); }
   .fill.ok { background: var(--sage-ok); }
@@ -413,6 +430,7 @@
         <span><i style="background:var(--sage-ok);"></i> target met</span>
         <span><i style="background:var(--rust);"></i> over safe limit (sodium, saturated fat, etc.)</span>
         <span><i style="background:var(--line);"></i> no established target - logged amount only</span>
+        <span><i style="background:var(--mustard);"></i> sedentary / very active reference range (where shown)</span>
       </div>
     </div>
 
@@ -775,6 +793,11 @@ let state = {
   // the daily log - once created, one behaves exactly like any other
   // database food and can be searched/added into any category.
   customFoods: [],
+  // Your own overrides for any nutrient target, keyed by nutrient key
+  // (e.g. customTargets.vitaminC_mg = 500). Stored as a PER-DAY value -
+  // the day multiplier still scales it same as a calculated default.
+  // Anything not in here just uses the normal calculated target.
+  customTargets: {},
   // Multiplies every target in the nutrient panel by this many days -
   // 1 is a normal daily view, higher values turn the targets into a
   // shopping-list total for planning multiple days at once.
@@ -806,7 +829,8 @@ function saveProfileToStorage() {
     hiddenBuckets: state.hiddenBuckets,
     bucketLabels: state.bucketLabels,
     dayMultiplier: state.dayMultiplier,
-    customFoods: state.customFoods
+    customFoods: state.customFoods,
+    customTargets: state.customTargets
   }));
 }
 function loadProfileFromStorage() {
@@ -821,6 +845,7 @@ function loadProfileFromStorage() {
     if (parsed.bucketLabels && typeof parsed.bucketLabels === 'object') state.bucketLabels = parsed.bucketLabels;
     if (typeof parsed.dayMultiplier === 'number') state.dayMultiplier = parsed.dayMultiplier;
     if (Array.isArray(parsed.customFoods)) state.customFoods = parsed.customFoods;
+    if (parsed.customTargets && typeof parsed.customTargets === 'object') state.customTargets = parsed.customTargets;
   } catch (e) { console.error('Could not read saved profile', e); }
 
   // Migration: older saved profiles only stored protein_g/fat_g/carbs_g,
@@ -1214,9 +1239,32 @@ function gaugeRow(nutrientKeys, label, actual, target, unit, opts) {
   const capPct = Math.min(pct, 130);
   const tickLeft = target > 0 ? Math.min(100 / 1.3, 100) : 0;
   const keyAttr = Array.isArray(nutrientKeys) ? nutrientKeys.join(',') : nutrientKeys;
+
+  // The input always shows/edits the PER-DAY target, regardless of the
+  // day multiplier currently in effect - so the number in the box stays
+  // stable when you switch between a daily view and a shopping-list view,
+  // rather than jumping around as you change that slider.
+  const perDayValue = opts.perDayValue;
+  const resetBtn = opts.isCustom
+    ? `<button class="reset-target-btn" onclick="resetCustomTarget('${keyAttr}')" title="Reset to the calculated default">&#8635;</button>`
+    : '';
+
+  // Reference ticks showing where this target would fall at Sedentary vs
+  // Very Active activity (holding your body stats and macro split
+  // constant) - only passed in for nutrients whose formula actually
+  // depends on activity level via the calorie chain.
+  let activityTicksHtml = '';
+  if (opts.activityRange && target > 0) {
+    const lowPct = Math.max(0, Math.min(100, (opts.activityRange.low / target / 1.3) * 100));
+    const highPct = Math.max(0, Math.min(100, (opts.activityRange.high / target / 1.3) * 100));
+    activityTicksHtml =
+      `<div class="activity-tick" style="left:${lowPct}%" title="Sedentary reference: ${fmt(opts.activityRange.low)} ${unit}"></div>` +
+      `<div class="activity-tick" style="left:${highPct}%" title="Very Active reference: ${fmt(opts.activityRange.high)} ${unit}"></div>`;
+  }
+
   return `<div class="nrow" data-nutrient-key="${keyAttr}" data-nutrient-label="${label}" data-nutrient-unit="${unit}">
-    <div class="nline"><span>${label}</span><span class="amt">${fmt(actual)} / ${fmt(target)} ${unit} (${pct.toFixed(0)}%)</span></div>
-    <div class="gauge"><div class="fill ${cls}" style="width:${capPct}%"></div><div class="tick" style="left:${tickLeft}%"></div></div>
+    <div class="nline"><span>${label}</span><span class="amt">${fmt(actual)} / <input type="number" class="target-input" value="${fmt(perDayValue)}" step="any" onchange="setCustomTarget('${keyAttr}', this.value)"> ${unit} (${pct.toFixed(0)}%)${resetBtn}</span></div>
+    <div class="gauge"><div class="fill ${cls}" style="width:${capPct}%"></div><div class="tick" style="left:${tickLeft}%"></div>${activityTicksHtml}</div>
   </div>`;
 }
 
@@ -1266,40 +1314,114 @@ function infoRow(key, label, actual, unit, note) {
 // Dispatches one row descriptor (see the CARB_ROWS/LIPID_ROWS/etc arrays
 // above) to the right target-calculation method, then hands off to
 // gaugeRow (or infoRow) to actually render it.
+// For nutrients whose target formula depends on activity level (via the
+// calorie chain), computes what the target WOULD be at Sedentary vs Very
+// Active activity, holding body stats and your current macro/protein %
+// split constant. Used to draw the two reference ticks on the gauge.
+// Returns null for nutrients activity doesn't actually affect (most
+// vitamins/minerals, and the fixed-amount lipids), since a range there
+// would misleadingly imply activity matters when it doesn't.
+const ACTIVITY_RANGE_KINDS = ['macro', 'netCarbs', 'calorieLinked', 'proteinScaled', 'pctCalories'];
+function computeActivityReferenceTargets(row, ctx) {
+  if (!ACTIVITY_RANGE_KINDS.includes(row.kind)) return null;
+
+  const { age, weightLbs, heightIn, gender } = state.profile;
+  const weightKg = lbsToKg(weightLbs);
+  const heightCm = inToCm(heightIn);
+  const bmr = estimateBmr(weightKg, heightCm, age, gender);
+
+  function macrosForActivity(activityKey) {
+    const calories = bmr * ACTIVITY_MULTIPLIERS[activityKey];
+    return {
+      calories,
+      proteinG: calories * state.targets.proteinPct / 100 / CALORIES_PER_GRAM.protein,
+      fatG: calories * state.targets.fatPct / 100 / CALORIES_PER_GRAM.fat,
+      carbsG: calories * state.targets.carbsPct / 100 / CALORIES_PER_GRAM.carbs,
+    };
+  }
+
+  function targetFor(vals) {
+    const effKcal = vals.calories * ctx.days;
+    switch (row.kind) {
+      case 'macro':
+        if (row.key === 'calories_kcal') return effKcal;
+        if (row.key === 'protein_g') return vals.proteinG * ctx.days;
+        if (row.key === 'fat_g') return vals.fatG * ctx.days;
+        if (row.key === 'carbs_g') return vals.carbsG * ctx.days;
+        return null;
+      case 'netCarbs':
+        return (vals.carbsG * ctx.days) - calorieLinkedTargets(effKcal).fiber_g;
+      case 'calorieLinked':
+        return calorieLinkedTargets(effKcal)[row.key];
+      case 'proteinScaled': {
+        const mgPerG = AMINO_PATTERN_MG_PER_G_PROTEIN[row.key];
+        return (mgPerG * vals.proteinG * ctx.days) / 1000;
+      }
+      case 'pctCalories': {
+        const limit = PERCENT_CALORIE_LIMITS[row.key];
+        return limit.pct * effKcal / limit.calsPerGram;
+      }
+      default:
+        return null;
+    }
+  }
+
+  return {
+    low: targetFor(macrosForActivity('sedentary')),
+    high: targetFor(macrosForActivity('veryActive')),
+  };
+}
+
 function renderNutrientRow(row, ctx) {
   const { totals, effectiveKcal, effectiveProteinG, effectiveTargets, rda, gender, days } = ctx;
   const actual = totals[row.key] || 0;
   const opts = {};
   if (row.isMax) opts.isMax = true;
   if (row.ceiling) opts.ceiling = row.ceiling;
+  const activityRange = computeActivityReferenceTargets(row, ctx);
+  if (activityRange) opts.activityRange = activityRange;
+
+  // Applies your custom override (if you've set one for this nutrient) on
+  // top of a freshly-computed default target. The override is always
+  // stored/edited as a PER-DAY number, then scaled by the day multiplier
+  // same as every computed default - so a shopping-list view (days > 1)
+  // still multiplies a custom target the same way it would a normal one.
+  function withCustomOverride(computedTarget) {
+    const perDayDefault = computedTarget / days;
+    const custom = state.customTargets[row.key];
+    const hasCustom = custom !== undefined;
+    opts.isCustom = hasCustom;
+    opts.perDayValue = hasCustom ? custom : perDayDefault;
+    return hasCustom ? custom * days : computedTarget;
+  }
 
   switch (row.kind) {
     case 'macro':
-      return gaugeRow(row.key, row.label, actual, effectiveTargets[row.key], row.unit, opts);
+      return gaugeRow(row.key, row.label, actual, withCustomOverride(effectiveTargets[row.key]), row.unit, opts);
     case 'netCarbs': {
       const fiberTarget = calorieLinkedTargets(effectiveKcal).fiber_g;
       const target = effectiveTargets.carbs_g - fiberTarget;
-      return gaugeRow(row.key, row.label, actual, target, row.unit, opts);
+      return gaugeRow(row.key, row.label, actual, withCustomOverride(target), row.unit, opts);
     }
     case 'calorieLinked':
-      return gaugeRow(row.key, row.label, actual, calorieLinkedTargets(effectiveKcal)[row.key], row.unit, opts);
+      return gaugeRow(row.key, row.label, actual, withCustomOverride(calorieLinkedTargets(effectiveKcal)[row.key]), row.unit, opts);
     case 'proteinScaled': {
       const mgPerG = AMINO_PATTERN_MG_PER_G_PROTEIN[row.key];
       const target = (mgPerG * effectiveProteinG) / 1000;
-      return gaugeRow(row.key, row.label, actual, target, row.unit, opts);
+      return gaugeRow(row.key, row.label, actual, withCustomOverride(target), row.unit, opts);
     }
     case 'fixedRda':
-      return gaugeRow(row.key, row.label, actual, (rda[row.key] || 0) * days, row.unit, opts);
+      return gaugeRow(row.key, row.label, actual, withCustomOverride((rda[row.key] || 0) * days), row.unit, opts);
     case 'pctCalories': {
       const limit = PERCENT_CALORIE_LIMITS[row.key];
       const target = limit.pct * effectiveKcal / limit.calsPerGram;
-      return gaugeRow(row.key, row.label, actual, target, row.unit, opts);
+      return gaugeRow(row.key, row.label, actual, withCustomOverride(target), row.unit, opts);
     }
     case 'aiTarget':
-      return gaugeRow(row.key, row.label, actual, OMEGA_AI_TARGETS[row.key][gender] * days, row.unit, opts);
+      return gaugeRow(row.key, row.label, actual, withCustomOverride(OMEGA_AI_TARGETS[row.key][gender] * days), row.unit, opts);
     case 'fixedTarget': {
       const amount = row.amount !== undefined ? row.amount : FIXED_LIMITS_MG[row.key];
-      return gaugeRow(row.key, row.label, actual, amount * days, row.unit, opts);
+      return gaugeRow(row.key, row.label, actual, withCustomOverride(amount * days), row.unit, opts);
     }
     case 'info':
     default:
@@ -1323,8 +1445,15 @@ function renderNutrientProgress() {
   const effectiveProteinG = state.targets.protein_g * days;
   const ctx = { totals, effectiveKcal, effectiveProteinG, effectiveTargets, rda, gender, days };
 
+  const caloriesCustom = state.customTargets.calories_kcal;
+  const caloriesHasCustom = caloriesCustom !== undefined;
+  const caloriesPerDayDefault = effectiveKcal / days;
+  const caloriesEffectiveTarget = caloriesHasCustom ? caloriesCustom * days : effectiveKcal;
+  const caloriesActivityRange = computeActivityReferenceTargets({ key: 'calories_kcal', kind: 'macro' }, ctx);
   document.getElementById('caloriesBar').innerHTML =
-    gaugeRow('calories_kcal', 'Calories', totals.calories_kcal || 0, effectiveKcal, 'kcal', {});
+    gaugeRow('calories_kcal', 'Calories', totals.calories_kcal || 0, caloriesEffectiveTarget, 'kcal',
+      { isCustom: caloriesHasCustom, perDayValue: caloriesHasCustom ? caloriesCustom : caloriesPerDayDefault,
+        activityRange: caloriesActivityRange });
   document.getElementById('carbBars').innerHTML = CARB_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
   document.getElementById('lipidBars').innerHTML = LIPID_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
 document.getElementById('proteinBars').innerHTML = PROTEIN_ROWS.map(r => renderNutrientRow(r, ctx)).join('');
@@ -1383,6 +1512,25 @@ function setBucketLabel(bucket, value) {
   }
   saveProfileToStorage();
   renderFoodGroups(); // refreshes this label everywhere it's shown (hidden-chips list, etc.)
+}
+
+// Sets a custom PER-DAY target for a nutrient, overriding the calculated
+// default. Typing back the exact default value (or clearing the field)
+// removes the override rather than saving a pointless duplicate.
+function setCustomTarget(key, value) {
+  const parsed = parseFloat(value);
+  if (isNaN(parsed) || parsed < 0) {
+    delete state.customTargets[key];
+  } else {
+    state.customTargets[key] = parsed;
+  }
+  saveProfileToStorage();
+  renderNutrientProgress();
+}
+function resetCustomTarget(key) {
+  delete state.customTargets[key];
+  saveProfileToStorage();
+  renderNutrientProgress();
 }
 
 function buildFoodGroupHtml(bucket) {
