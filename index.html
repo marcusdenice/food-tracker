@@ -1243,7 +1243,7 @@ function gaugeRow(nutrientKeys, label, actual, target, unit, opts) {
     pct = target > 0 ? (actual / target * 100) : 0;
     cls = pct >= 100 ? 'ok' : (pct >= 70 ? 'mid' : 'low');
   }
-  const capPct = Math.min(pct, 130);
+  const capPct = Math.min(pct, 130) / 1.3; // same 130%-scale the tick position uses, so "100% of target" visually lines up exactly with the tick
   const tickLeft = target > 0 ? Math.min(100 / 1.3, 100) : 0;
   const keyAttr = Array.isArray(nutrientKeys) ? nutrientKeys.join(',') : nutrientKeys;
 
