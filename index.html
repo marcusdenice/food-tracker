@@ -233,7 +233,7 @@
     border: 1px solid var(--line);
   }
   .gauge .fill { height: 100%; border-radius: 4px 0 0 4px; transition: width 0.15s ease; }
-  .gauge .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ink); opacity: 0.4; }
+
   .activity-tick-marker {
     position: absolute; top: -6px; width: 0; height: 0; transform: translateX(-50%);
     border-left: 5px solid transparent; border-right: 5px solid transparent;
@@ -1211,6 +1211,20 @@ function positionTooltip(tooltip, row) {
 function setupNutrientTooltips() {
   const tooltip = document.getElementById('nutrientTooltip');
   document.addEventListener('mouseover', e => {
+    // Activity reference markers are nested inside a .nrow, so check for
+    // them FIRST - otherwise the row's own (much bigger) tooltip would
+    // fire instead of this simpler explanation.
+    const marker = e.target.closest('.activity-tick-marker');
+    if (marker) {
+      const level = marker.dataset.activityLevel;
+      const value = marker.dataset.activityValue;
+      tooltip.innerHTML = `<div class="tooltip-title">${level} Reference</div>
+        <p class="tooltip-desc">Shows where this target would land if your activity level were "${level}" instead of your
+        current setting, holding your body stats and macro split the same. At "${level}": <strong>${value}</strong>.</p>`;
+      tooltip.classList.add('visible');
+      positionTooltip(tooltip, marker);
+      return;
+    }
     const row = e.target.closest('.nrow[data-nutrient-key]');
     if (!row) return;
     const keys = row.dataset.nutrientKey.split(',');
@@ -1221,6 +1235,12 @@ function setupNutrientTooltips() {
     positionTooltip(tooltip, row);
   });
   document.addEventListener('mouseout', e => {
+    const marker = e.target.closest('.activity-tick-marker');
+    if (marker) {
+      if (marker.contains(e.relatedTarget)) return;
+      tooltip.classList.remove('visible');
+      return;
+    }
     const row = e.target.closest('.nrow[data-nutrient-key]');
     if (!row) return;
     if (row.contains(e.relatedTarget)) return; // still inside the same row
@@ -1243,8 +1263,12 @@ function gaugeRow(nutrientKeys, label, actual, target, unit, opts) {
     pct = target > 0 ? (actual / target * 100) : 0;
     cls = pct >= 100 ? 'ok' : (pct >= 70 ? 'mid' : 'low');
   }
-  const capPct = Math.min(pct, 130) / 1.3; // same 130%-scale the tick position uses, so "100% of target" visually lines up exactly with the tick
-  const tickLeft = target > 0 ? Math.min(100 / 1.3, 100) : 0;
+  // Simple 0-100 scale - the bar just fills to however close to (or past)
+  // 100% you are, capped visually at 100% either way. Whether "past 100%"
+  // is good (protein) or bad (sodium) is entirely carried by the fill
+  // COLOR (cls above, e.g. red/"over-max" for safety-limit nutrients),
+  // not by any extra bar length.
+  const capPct = Math.min(pct, 100);
   const keyAttr = Array.isArray(nutrientKeys) ? nutrientKeys.join(',') : nutrientKeys;
 
   // The input always shows/edits the PER-DAY target, regardless of the
@@ -1256,26 +1280,25 @@ function gaugeRow(nutrientKeys, label, actual, target, unit, opts) {
     ? `<button class="reset-target-btn" onclick="resetCustomTarget('${keyAttr}')" title="Reset to the calculated default">&#8635;</button>`
     : '';
 
-  // Reference ticks showing where this target would fall at Sedentary vs
-  // Very Active activity (holding your body stats and macro split
+  // Reference markers showing where this target would fall at Sedentary
+  // vs Very Active activity (holding your body stats and macro split
   // constant) - only passed in for nutrients whose formula actually
-  // depends on activity level via the calorie chain. Rendered as small
-  // triangle markers in the OUTER wrapper, not inside .gauge itself,
-  // since .gauge has overflow:hidden (needed for the rounded fill bar)
-  // which would otherwise clip them.
+  // depends on activity level via the calorie chain. Data attributes
+  // (not a native title) drive a custom hover popup explaining what
+  // these are, wired up in setupNutrientTooltips().
   let activityTicksHtml = '';
   if (opts.activityRange && target > 0) {
-    const lowPct = Math.max(0, Math.min(100, (opts.activityRange.low / target / 1.3) * 100));
-    const highPct = Math.max(0, Math.min(100, (opts.activityRange.high / target / 1.3) * 100));
+    const lowPct = Math.max(0, Math.min(100, (opts.activityRange.low / target) * 100));
+    const highPct = Math.max(0, Math.min(100, (opts.activityRange.high / target) * 100));
     activityTicksHtml =
-      `<div class="activity-tick-marker low" style="left:${lowPct}%" title="Sedentary reference: ${fmt(opts.activityRange.low)} ${unit}"></div>` +
-      `<div class="activity-tick-marker high" style="left:${highPct}%" title="Very Active reference: ${fmt(opts.activityRange.high)} ${unit}"></div>`;
+      `<div class="activity-tick-marker low" style="left:${lowPct}%" data-activity-level="Sedentary" data-activity-value="${fmt(opts.activityRange.low)} ${unit}"></div>` +
+      `<div class="activity-tick-marker high" style="left:${highPct}%" data-activity-level="Very Active" data-activity-value="${fmt(opts.activityRange.high)} ${unit}"></div>`;
   }
 
   return `<div class="nrow" data-nutrient-key="${keyAttr}" data-nutrient-label="${label}" data-nutrient-unit="${unit}">
     <div class="nline"><span>${label}</span><span class="amt">${fmt(actual)} / <input type="number" class="target-input" value="${fmt(perDayValue)}" step="any" onchange="setCustomTarget('${keyAttr}', this.value)"> ${unit} (${pct.toFixed(0)}%)${resetBtn}</span></div>
     <div class="gauge-wrap">
-      <div class="gauge"><div class="fill ${cls}" style="width:${capPct}%"></div><div class="tick" style="left:${tickLeft}%"></div></div>
+      <div class="gauge"><div class="fill ${cls}" style="width:${capPct}%"></div></div>
       ${activityTicksHtml}
     </div>
   </div>`;
