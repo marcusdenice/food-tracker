@@ -240,6 +240,16 @@
     border-top: 6px solid var(--mustard);
   }
   .activity-tick-marker.high { border-top-color: var(--moss); }
+  .floor-tick-marker {
+    position: absolute; top: 0; bottom: 0; width: 2px; transform: translateX(-50%);
+    background: var(--rust); opacity: 0.85;
+  }
+  .floor-tick-marker::after {
+    content: ''; position: absolute; top: -5px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid var(--rust);
+  }
+  .ref-note { color: var(--ink-soft); font-family: var(--font-body); font-size: 11px; font-style: italic; }
   .fill.low { background: var(--red-low); }
   .fill.mid { background: var(--amber-warn); }
   .fill.ok { background: var(--sage-ok); }
@@ -554,6 +564,12 @@
   Methionine/Cystine and Phenylalanine/Tyrosine are officially scored by WHO/FAO as combined pairs, not
   individually - each amino acid in a pair is shown against that same shared target as a simplification, rather
   than two independently-derived numbers.
+  <br><br>
+  Each amino acid row shows two WHO/FAO/UNU-derived scales at once: the number/%/color it's judged against is
+  your body-weight-based physiological floor (a fixed daily minimum, independent of diet), while the bar's full
+  width is scaled to a more generous protein-quality-based reference amount (the same ratio used for PDCAAS/DIAAS
+  scoring, scaled to your protein goal). The red tick mark inside each bar shows exactly where that body-weight
+  floor sits along the bar - hover it for the precise number.
 </footer>
 
 <!-- Shared tooltip element - one div, repositioned and refilled on hover
@@ -649,6 +665,22 @@ const AMINO_PATTERN_MG_PER_G_PROTEIN = {
   tyrosine_g: 38, valine_g: 39,
 };
 
+// FAO/WHO/UNU (2007) amino acid requirement pattern, mg PER KG OF BODY
+// WEIGHT per day - the actual physiological minimum ("the floor"), independent
+// of how much protein you eat. This is a DIFFERENT expression of the same
+// underlying WHO/FAO/UNU data as AMINO_PATTERN_MG_PER_G_PROTEIN above: that
+// one is a per-gram-of-protein ratio meant for scoring protein QUALITY
+// (it's how PDCAAS/DIAAS are calculated), while this one is a fixed daily
+// requirement tied to body weight. Same simplification as above applies to
+// the combined pairs: Methionine+Cystine (15 mg/kg combined) and
+// Phenylalanine+Tyrosine (25 mg/kg combined) are each applied to both
+// members of their pair individually rather than split.
+const AMINO_MG_PER_KG_BODYWEIGHT = {
+  cystine_g: 15, histidine_g: 10, isoleucine_g: 20, leucine_g: 39, lysine_g: 30,
+  methionine_g: 15, phenylalanine_g: 25, threonine_g: 15, tryptophan_g: 4,
+  tyrosine_g: 25, valine_g: 26,
+};
+
 // Adequate Intake (AI) values for essential fatty acids (IOM/NAM Dietary
 // Reference Intakes), by sex. EPA/DHA don't have an official AI on their
 // own - 250mg/day combined is a commonly cited general-health benchmark
@@ -677,9 +709,19 @@ const FIXED_LIMITS_MG = { cholesterol_mg: 300 };
 
 // ---- The five target categories, in the order they're displayed ----
 // kind values: 'macro' (protein/fat/carbs target from the slider),
-// 'netCarbs' (derived carbs - fiber), 'calorieLinked', 'proteinScaled',
-// 'fixedRda', 'pctCalories' (isMax), 'aiTarget', 'fixedTarget', 'info'
-// (logged amount only - no defensible target to compare against).
+// 'netCarbs' (derived carbs - fiber), 'calorieLinked', 'aminoBodyWeight'
+// (essential amino acids - see below), 'fixedRda', 'pctCalories' (isMax),
+// 'aiTarget', 'fixedTarget', 'info' (logged amount only - no defensible
+// target to compare against).
+//
+// 'aminoBodyWeight' rows show TWO amino acid scales at once: the tracked
+// "main target" (the number in the box, the % complete, and the fill
+// color) is the WHO/FAO/UNU body-weight-based requirement - the true
+// physiological floor. The bar's full width, though, is scaled to the
+// larger protein-based reference amount (AMINO_PATTERN_MG_PER_G_PROTEIN
+// scaled by your protein goal) - a looser "if your protein were reference
+// quality" benchmark - shown as a tick mark inside the bar so you can see
+// both without the bar constantly reading "200%+".
 const CARB_ROWS = [
   { key: 'carbs_g', label: 'Carbs', unit: 'g', kind: 'macro' },
   { key: 'netCarbs_g', label: 'Net Carbs', unit: 'g', kind: 'netCarbs' },
@@ -706,17 +748,17 @@ const LIPID_ROWS = [
 ];
 const PROTEIN_ROWS = [
   { key: 'protein_g', label: 'Protein', unit: 'g', kind: 'macro' },
-  { key: 'cystine_g', label: 'Cystine', unit: 'g', kind: 'proteinScaled' },
-  { key: 'histidine_g', label: 'Histidine*', unit: 'g', kind: 'proteinScaled' },
-  { key: 'isoleucine_g', label: 'Isoleucine*', unit: 'g', kind: 'proteinScaled' },
-  { key: 'leucine_g', label: 'Leucine*', unit: 'g', kind: 'proteinScaled' },
-  { key: 'lysine_g', label: 'Lysine*', unit: 'g', kind: 'proteinScaled' },
-  { key: 'methionine_g', label: 'Methionine*', unit: 'g', kind: 'proteinScaled' },
-  { key: 'phenylalanine_g', label: 'Phenylalanine*', unit: 'g', kind: 'proteinScaled' },
-  { key: 'threonine_g', label: 'Threonine*', unit: 'g', kind: 'proteinScaled' },
-  { key: 'tryptophan_g', label: 'Tryptophan*', unit: 'g', kind: 'proteinScaled' },
-  { key: 'tyrosine_g', label: 'Tyrosine', unit: 'g', kind: 'proteinScaled' },
-  { key: 'valine_g', label: 'Valine*', unit: 'g', kind: 'proteinScaled' },
+  { key: 'cystine_g', label: 'Cystine', unit: 'g', kind: 'aminoBodyWeight' },
+  { key: 'histidine_g', label: 'Histidine*', unit: 'g', kind: 'aminoBodyWeight' },
+  { key: 'isoleucine_g', label: 'Isoleucine*', unit: 'g', kind: 'aminoBodyWeight' },
+  { key: 'leucine_g', label: 'Leucine*', unit: 'g', kind: 'aminoBodyWeight' },
+  { key: 'lysine_g', label: 'Lysine*', unit: 'g', kind: 'aminoBodyWeight' },
+  { key: 'methionine_g', label: 'Methionine*', unit: 'g', kind: 'aminoBodyWeight' },
+  { key: 'phenylalanine_g', label: 'Phenylalanine*', unit: 'g', kind: 'aminoBodyWeight' },
+  { key: 'threonine_g', label: 'Threonine*', unit: 'g', kind: 'aminoBodyWeight' },
+  { key: 'tryptophan_g', label: 'Tryptophan*', unit: 'g', kind: 'aminoBodyWeight' },
+  { key: 'tyrosine_g', label: 'Tyrosine', unit: 'g', kind: 'aminoBodyWeight' },
+  { key: 'valine_g', label: 'Valine*', unit: 'g', kind: 'aminoBodyWeight' },
 ];
 const VITAMIN_ROWS = [
   { key: 'thiamin_mg', label: 'B1 (Thiamine)', unit: 'mg', kind: 'calorieLinked' },
@@ -1225,6 +1267,20 @@ function setupNutrientTooltips() {
       positionTooltip(tooltip, marker);
       return;
     }
+    // Floor tick markers (currently used for amino acids) are also nested
+    // inside a .nrow, so check for them before the row's own tooltip too.
+    const floorMarker = e.target.closest('.floor-tick-marker');
+    if (floorMarker) {
+      const floorLabel = floorMarker.dataset.floorLabel;
+      const floorValue = floorMarker.dataset.floorValue;
+      tooltip.innerHTML = `<div class="tooltip-title">${floorLabel}</div>
+        <p class="tooltip-desc">This bar's full width is scaled to a more generous diet-quality reference amount.
+        This tick marks the WHO/FAO/UNU body-weight-based requirement - the true physiological floor - which is
+        the number this row's %, color, and target box are actually judged against: <strong>${floorValue}</strong>.</p>`;
+      tooltip.classList.add('visible');
+      positionTooltip(tooltip, floorMarker);
+      return;
+    }
     const row = e.target.closest('.nrow[data-nutrient-key]');
     if (!row) return;
     const keys = row.dataset.nutrientKey.split(',');
@@ -1238,6 +1294,12 @@ function setupNutrientTooltips() {
     const marker = e.target.closest('.activity-tick-marker');
     if (marker) {
       if (marker.contains(e.relatedTarget)) return;
+      tooltip.classList.remove('visible');
+      return;
+    }
+    const floorMarker = e.target.closest('.floor-tick-marker');
+    if (floorMarker) {
+      if (floorMarker.contains(e.relatedTarget)) return;
       tooltip.classList.remove('visible');
       return;
     }
@@ -1263,12 +1325,17 @@ function gaugeRow(nutrientKeys, label, actual, target, unit, opts) {
     pct = target > 0 ? (actual / target * 100) : 0;
     cls = pct >= 100 ? 'ok' : (pct >= 70 ? 'mid' : 'low');
   }
-  // Simple 0-100 scale - the bar just fills to however close to (or past)
-  // 100% you are, capped visually at 100% either way. Whether "past 100%"
-  // is good (protein) or bad (sodium) is entirely carried by the fill
-  // COLOR (cls above, e.g. red/"over-max" for safety-limit nutrients),
-  // not by any extra bar length.
-  const capPct = Math.min(pct, 100);
+
+  // Normally the bar's own 100% IS the target, so fill % == pct above.
+  // But some rows (amino acids - see 'aminoBodyWeight') pass a separate,
+  // more generous barSpanTarget: the bar's full width then represents
+  // THAT larger number instead, and "target" just becomes a marked
+  // threshold tick partway along it. This keeps the tracked number/%/
+  // color judged against the true (smaller) target while still giving
+  // the bar room to show real progress instead of pinning at 100% early.
+  const barSpan = (opts.barSpanTarget && opts.barSpanTarget > 0) ? opts.barSpanTarget : target;
+  const fillPct = barSpan > 0 ? (actual / barSpan * 100) : 0;
+  const capPct = Math.min(fillPct, 100);
   const keyAttr = Array.isArray(nutrientKeys) ? nutrientKeys.join(',') : nutrientKeys;
 
   // The input always shows/edits the PER-DAY target, regardless of the
@@ -1287,19 +1354,33 @@ function gaugeRow(nutrientKeys, label, actual, target, unit, opts) {
   // (not a native title) drive a custom hover popup explaining what
   // these are, wired up in setupNutrientTooltips().
   let activityTicksHtml = '';
-  if (opts.activityRange && target > 0) {
-    const lowPct = Math.max(0, Math.min(100, (opts.activityRange.low / target) * 100));
-    const highPct = Math.max(0, Math.min(100, (opts.activityRange.high / target) * 100));
+  if (opts.activityRange && barSpan > 0) {
+    const lowPct = Math.max(0, Math.min(100, (opts.activityRange.low / barSpan) * 100));
+    const highPct = Math.max(0, Math.min(100, (opts.activityRange.high / barSpan) * 100));
     activityTicksHtml =
       `<div class="activity-tick-marker low" style="left:${lowPct}%" data-activity-level="Sedentary" data-activity-value="${fmt(opts.activityRange.low)} ${unit}"></div>` +
       `<div class="activity-tick-marker high" style="left:${highPct}%" data-activity-level="Very Active" data-activity-value="${fmt(opts.activityRange.high)} ${unit}"></div>`;
   }
 
+  // Floor tick: marks where the (smaller, tracked) "target" sits along a
+  // bar that's actually scaled to the larger barSpanTarget - e.g. the
+  // amino acid body-weight minimum shown as a threshold inside a bar
+  // whose full width is the more generous protein-based reference amount.
+  let floorTickHtml = '';
+  let refLineHtml = '';
+  if (opts.barSpanTarget && barSpan > 0 && barSpan !== target) {
+    const floorPct = Math.max(0, Math.min(100, (target / barSpan) * 100));
+    const floorLabel = opts.floorTickLabel || 'Minimum target';
+    floorTickHtml = `<div class="floor-tick-marker" style="left:${floorPct}%" data-floor-label="${floorLabel}" data-floor-value="${fmt(target)} ${unit}"></div>`;
+    refLineHtml = `<span class="ref-note"> · bar scaled to diet-quality ref ${fmt(barSpan)} ${unit}</span>`;
+  }
+
   return `<div class="nrow" data-nutrient-key="${keyAttr}" data-nutrient-label="${label}" data-nutrient-unit="${unit}">
-    <div class="nline"><span>${label}</span><span class="amt">${fmt(actual)} / <input type="number" class="target-input" value="${fmt(perDayValue)}" step="any" onchange="setCustomTarget('${keyAttr}', this.value)"> ${unit} (${pct.toFixed(0)}%)${resetBtn}</span></div>
+    <div class="nline"><span>${label}</span><span class="amt">${fmt(actual)} / <input type="number" class="target-input" value="${fmt(perDayValue)}" step="any" onchange="setCustomTarget('${keyAttr}', this.value)"> ${unit} (${pct.toFixed(0)}%)${resetBtn}${refLineHtml}</span></div>
     <div class="gauge-wrap">
       <div class="gauge"><div class="fill ${cls}" style="width:${capPct}%"></div></div>
       ${activityTicksHtml}
+      ${floorTickHtml}
     </div>
   </div>`;
 }
@@ -1448,10 +1529,25 @@ function renderNutrientRow(row, ctx) {
     }
     case 'calorieLinked':
       return gaugeRow(row.key, row.label, actual, withCustomOverride(calorieLinkedTargets(effectiveKcal)[row.key]), row.unit, opts);
-    case 'proteinScaled': {
+    case 'aminoBodyWeight': {
+      // Main target: the true WHO/FAO/UNU physiological floor, scaled to
+      // this person's body weight - independent of how much protein they
+      // actually eat. This is the number in the edit box, the % complete,
+      // and what the fill color (low/mid/ok) is judged against.
+      const mgPerKg = AMINO_MG_PER_KG_BODYWEIGHT[row.key];
+      const bodyWeightTarget = (mgPerKg * ctx.weightKg * days) / 1000;
+
+      // Reference scale for the bar itself: the more generous protein-
+      // quality-based amount (same pattern used for PDCAAS/DIAAS scoring),
+      // scaled by this person's protein goal. Typically larger than the
+      // body-weight floor, so it gives the bar room to show meaningful
+      // progress instead of constantly reading "200%+".
       const mgPerG = AMINO_PATTERN_MG_PER_G_PROTEIN[row.key];
-      const target = (mgPerG * effectiveProteinG) / 1000;
-      return gaugeRow(row.key, row.label, actual, withCustomOverride(target), row.unit, opts);
+      const proteinScaledTarget = (mgPerG * effectiveProteinG) / 1000;
+
+      opts.barSpanTarget = proteinScaledTarget;
+      opts.floorTickLabel = 'Body-weight minimum';
+      return gaugeRow(row.key, row.label, actual, withCustomOverride(bodyWeightTarget), row.unit, opts);
     }
     case 'fixedRda':
       return gaugeRow(row.key, row.label, actual, withCustomOverride((rda[row.key] || 0) * days), row.unit, opts);
@@ -1486,7 +1582,8 @@ function renderNutrientProgress() {
     carbs_g: state.targets.carbs_g * days,
   };
   const effectiveProteinG = state.targets.protein_g * days;
-  const ctx = { totals, effectiveKcal, effectiveProteinG, effectiveTargets, rda, gender, days };
+  const weightKg = lbsToKg(state.profile.weightLbs);
+  const ctx = { totals, effectiveKcal, effectiveProteinG, effectiveTargets, rda, gender, days, weightKg };
 
   const caloriesCustom = state.customTargets.calories_kcal;
   const caloriesHasCustom = caloriesCustom !== undefined;
