@@ -2,7 +2,7 @@
 
 A single-page nutrition tracker. You set calorie and macro targets, log foods by the gram, and watch more than 60 nutrients (vitamins, minerals, amino acids and fatty acids) fill in against your personal targets as you go.
 
-**Live site:** _add your GitHub Pages link here_
+**Live site:** https://marcusdenice.github.io/food-tracker/
 
 ## Features
 
